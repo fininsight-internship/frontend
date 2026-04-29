@@ -79,8 +79,8 @@ frontend/
 
 ### 1. 저장소 클론
 ```bash
-git clone https://github.com/your-id/job-agent-frontend.git
-cd job-agent-frontend
+git clone https://github.com/fininsight-internship/frontend.git
+cd frontend
 ```
 
 ### 2. 패키지 설치
