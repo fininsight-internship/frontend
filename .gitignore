@@ -11,6 +11,8 @@ lerna-debug.log*
 node_modules
 .pnp
 .pnp.js
+.vite
+.vite/
 
 # Build output
 dist
