@@ -23,6 +23,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.25rem 0.75rem 1.5rem;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .logoIcon {
@@ -89,6 +91,54 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+/* ─── User box ─── */
+.userBox {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+}
+
+.userAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.userName {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.userRole {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ─── Main Content Area ─── */

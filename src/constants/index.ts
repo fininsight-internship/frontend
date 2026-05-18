@@ -2,10 +2,14 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localho
 
 export const ROUTES = {
   HOME: '/',
+  LANDING: '/landing',
+  LOGIN: '/login',
+  SIGNUP: '/signup',
   ANALYSIS: '/analysis',
   ANALYSIS_CHAT: '/analysis/chat',
   ANALYSIS_REPORT: '/analysis/report',
   RESUME: '/resume',
   INTERVIEW: '/interview',
   MYPAGE: '/mypage',
+  APPLICATIONS: '/applications',
 } as const;

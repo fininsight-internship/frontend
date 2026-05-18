@@ -1,8 +1,8 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, Link } from 'react-router-dom';
 import { ROUTES } from '../../constants';
 import {
   LayoutDashboard,
-  Search,
+  ClipboardList,
   FileEdit,
   MessageSquare,
   User,
@@ -11,9 +11,9 @@ import styles from './MainLayout.module.css';
 
 const navItems = [
   { path: ROUTES.HOME, label: '대시보드', icon: LayoutDashboard },
-  { path: ROUTES.ANALYSIS, label: 'JD & 기업분석', icon: Search },
+  { path: ROUTES.APPLICATIONS, label: '지원 현황', icon: ClipboardList },
   { path: ROUTES.RESUME, label: '자기소개서', icon: FileEdit },
-  { path: ROUTES.INTERVIEW, label: '면접 준비', icon: MessageSquare },
+  { path: ROUTES.INTERVIEW, label: '면접 연습', icon: MessageSquare },
   { path: ROUTES.MYPAGE, label: '마이페이지', icon: User },
 ];
 
@@ -21,10 +21,11 @@ export default function MainLayout() {
   return (
     <div className={styles.layout}>
       <aside className={styles.sidebar}>
-        <div className={styles.logo}>
+        <Link to={ROUTES.HOME} className={styles.logo}>
           <div className={styles.logoIcon}>C</div>
           <span className={styles.logoText}>CareerAI</span>
-        </div>
+        </Link>
+
         <nav className={styles.nav}>
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -45,7 +46,16 @@ export default function MainLayout() {
             );
           })}
         </nav>
+
+        <div className={styles.userBox}>
+          <div className={styles.userAvatar}>SJ</div>
+          <div className={styles.userInfo}>
+            <p className={styles.userName}>이성재</p>
+            <p className={styles.userRole}>프론트엔드 개발자</p>
+          </div>
+        </div>
       </aside>
+
       <main className={styles.content}>
         <Outlet />
       </main>

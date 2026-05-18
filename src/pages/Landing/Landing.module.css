@@ -1,0 +1,213 @@
+/* ── Page ─────────────────────────────────────────────── */
+.page {
+  min-height: 100vh;
+  background: #f0f4ff;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ───────────────────────────────────────────── */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.headerInner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.logoIcon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.logoText {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.navLink {
+  font-size: 0.9rem;
+  color: #4b5563;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+.navLink:hover { color: #3b82f6; }
+
+.loginBtn {
+  padding: 0.45rem 1rem;
+  border: none;
+  background: transparent;
+  color: #3b82f6;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.loginBtn:hover { color: #2563eb; }
+
+.startBtn {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.startBtn:hover { opacity: 0.88; }
+
+/* ── Hero ─────────────────────────────────────────────── */
+.hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6rem 2rem 4rem;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.heroBadge {
+  display: inline-block;
+  padding: 0.35rem 1rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #c7d7fe;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  color: #3b82f6;
+  font-weight: 600;
+  margin-bottom: 1.75rem;
+}
+
+.heroTitle {
+  font-size: 3rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.25;
+  margin: 0 0 1rem;
+  letter-spacing: -0.02em;
+}
+
+.heroHighlight {
+  color: #3b82f6;
+}
+
+.heroDesc {
+  font-size: 1rem;
+  color: #6b7280;
+  line-height: 1.7;
+  margin: 0 0 2.5rem;
+}
+
+.heroBtns {
+  display: flex;
+  gap: 1rem;
+}
+
+.heroPrimary {
+  padding: 0.8rem 2rem;
+  border: none;
+  border-radius: 10px;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.heroPrimary:hover { opacity: 0.88; }
+
+.heroSecondary {
+  padding: 0.8rem 2rem;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  color: #374151;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.heroSecondary:hover { border-color: #3b82f6; color: #3b82f6; }
+
+/* ── Features ─────────────────────────────────────────── */
+.features {
+  padding: 4rem 2rem;
+  background: #fff;
+}
+
+.featureGrid {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+.featureCard {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.featureIcon {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.featureTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.featureDesc {
+  font-size: 0.82rem;
+  color: #6b7280;
+  line-height: 1.55;
+  margin: 0;
+}
