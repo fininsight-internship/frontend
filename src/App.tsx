@@ -13,14 +13,13 @@ import ResumePage from './pages/Resume/index.tsx';
 import ResumeEditorPage from './pages/ResumeEditor/index.tsx';
 import ExperienceEditPage from './pages/ExperienceEdit/index.tsx';
 import ApplicationsPage from './pages/Applications/index.tsx';
-import InterviewPage from './pages/Interview/index.tsx';
+import InterviewPage from './pages/Interview/InterviewHome.tsx';
+import InterviewDetailPage from './pages/Interview/InterviewDetail.tsx';
 import MyPage from './pages/MyPage/index.tsx';
 import CompanyPage from './pages/Company_JD/index.tsx';
 import LandingPage from './pages/Landing/index.tsx';
 import LoginPage from './pages/Login/index.tsx';
 import SignupPage from './pages/Signup/index.tsx';
-import InterviewHome from './pages/Interview/InterviewHome.tsx';
-import InterviewDetail from './pages/Interview/InterviewDetail.tsx';
 
 function App() {
   return (
@@ -34,10 +33,9 @@ function App() {
           <Route path={ROUTES.RESUME} element={<ResumePage />} />
           <Route path={ROUTES.APPLICATIONS} element={<ApplicationsPage />} />
           <Route path={ROUTES.INTERVIEW} element={<InterviewPage />} />
+          <Route path={ROUTES.INTERVIEW_DETAIL} element={<InterviewDetailPage />} />
           <Route path={ROUTES.MYPAGE} element={<MyPage />} />
           <Route path={ROUTES.COMPANY} element={<CompanyPage />} />
-          <Route path={ROUTES.INTERVIEW} element={<InterviewHome />} />
-          <Route path={ROUTES.INTERVIEW_DETAIL} element={<InterviewDetail />} />
         </Route>
         <Route path="/resume/editor" element={<ResumeEditorPage />} />
         <Route path="/experience/edit" element={<ExperienceEditPage />} />

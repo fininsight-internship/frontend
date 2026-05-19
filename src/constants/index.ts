@@ -9,6 +9,9 @@ export const ROUTES = {
   ANALYSIS_CHAT: '/analysis/chat',
   ANALYSIS_REPORT: '/analysis/report',
   RESUME: '/resume',
+  APPLICATIONS: '/applications',
   INTERVIEW: '/interview',
   INTERVIEW_DETAIL: '/interview/:id',
+  MYPAGE: '/mypage',
+  COMPANY: '/company',
 } as const;
