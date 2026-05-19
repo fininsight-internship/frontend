@@ -6,4 +6,5 @@ export const ROUTES = {
   JD: '/jd',
   RESUME: '/resume',
   INTERVIEW: '/interview',
+  INTERVIEW_DETAIL: '/interview/:id',
 } as const;

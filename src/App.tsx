@@ -9,7 +9,8 @@ import HomePage from './pages/Home/index.tsx';
 import CompanyPage from './pages/Company/index.tsx';
 import JDPage from './pages/JD/index.tsx';
 import ResumePage from './pages/Resume/index.tsx';
-import InterviewPage from './pages/Interview/index.tsx';
+import InterviewHome from './pages/Interview/InterviewHome.tsx';
+import InterviewDetail from './pages/Interview/InterviewDetail.tsx';
 
 function App() {
   return (
@@ -20,7 +21,8 @@ function App() {
           <Route path={ROUTES.COMPANY} element={<CompanyPage />} />
           <Route path={ROUTES.JD} element={<JDPage />} />
           <Route path={ROUTES.RESUME} element={<ResumePage />} />
-          <Route path={ROUTES.INTERVIEW} element={<InterviewPage />} />
+          <Route path={ROUTES.INTERVIEW} element={<InterviewHome />} />
+          <Route path={ROUTES.INTERVIEW_DETAIL} element={<InterviewDetail />} />
         </Route>
         <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
       </Routes>
