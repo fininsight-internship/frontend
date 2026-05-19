@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ROUTES } from '../../constants';
+import api from '../../services/api';
 import styles from './Signup.module.css';
 
 const JOB_CHIPS = ['프론트엔드', '백엔드', '데이터 분석', '기획/PM', '마케팅', '디자인'];
@@ -18,6 +19,8 @@ export default function SignupPage() {
   const [jobs, setJobs] = useState<string[]>([]);
   const [agreed, setAgreed] = useState(false);
   const [errors, setErrors] = useState<Partial<typeof form & { jobs: string; agree: string }>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, [k]: e.target.value }));
@@ -36,10 +39,33 @@ export default function SignupPage() {
     return Object.keys(e).length === 0;
   };
 
-  const handleNext = (e: React.FormEvent) => {
+  const handleNext = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    navigate('/experience/edit', { state: { fromSignup: true, step: 2 } });
+
+    setLoading(true);
+    setApiError(null);
+    try {
+      const response = await api.post('/auth/signup', {
+        email: form.email,
+        password: form.password,
+        name: form.name,
+        role: jobs.join(', '),
+      });
+      
+      console.log('✅ Signup Success:', response.data);
+      if (response.data?.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+      
+      navigate('/experience/edit', { state: { fromSignup: true, step: 2 } });
+    } catch (err: any) {
+      console.error('❌ Signup API Error:', err);
+      const errMsg = err.response?.data?.detail || '회원가입 처리 중 오류가 발생했습니다.';
+      setApiError(errMsg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -74,6 +100,11 @@ export default function SignupPage() {
 
         {/* Form */}
         <form className={styles.form} onSubmit={handleNext}>
+          {apiError && (
+            <div className={styles.apiErrorBox}>
+              ⚠️ {apiError}
+            </div>
+          )}
           {/* Name + Nickname */}
           <div className={styles.row}>
             <div className={styles.fieldGroup}>
@@ -154,7 +185,9 @@ export default function SignupPage() {
           </div>
 
           {/* Submit */}
-          <button type="submit" className={styles.submitBtn}>다음 단계 →</button>
+          <button type="submit" className={styles.submitBtn} disabled={loading}>
+            {loading ? '가입 처리 중...' : '다음 단계 →'}
+          </button>
 
           {/* Terms */}
           <label className={styles.termsRow}>

@@ -254,9 +254,40 @@ export default function ExperienceEditPage() {
   const navigate = useNavigate();
   const state = (location.state || {}) as LocationState;
 
+  // 로그인된 실제 사용자 정보 파싱 및 저장 키 설정
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const dbKey = user ? `experiences_${user.id}` : 'experiences_guest';
+
+  // 신규 사용자용 빈 기본 템플릿
+  const cleanTemplate: Entry[] = [
+    {
+      id: '1',
+      company: '',
+      role: '',
+      startDate: '',
+      endDate: '',
+      skills: [],
+      detail: '',
+    }
+  ];
+
+  // 기저장 데이터 로드 로직 (실제 신규 로그인 유저는 빈 입력란으로 시작, 비회원 게스트는 Mock 노출)
+  const loadSavedEntries = (): Entry[] => {
+    const saved = localStorage.getItem(dbKey);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error parsing user experiences:', e);
+      }
+    }
+    return user ? cleanTemplate : DEFAULT_ENTRIES;
+  };
+
   const fromSignup = state.fromSignup ?? false;
   const [activeCategory, setActiveCategory] = useState<CategoryKey>(state.category || '경력인턴');
-  const [entries, setEntries] = useState<Entry[]>(state.entries || DEFAULT_ENTRIES);
+  const [entries, setEntries] = useState<Entry[]>(state.entries || loadSavedEntries());
   const [activeIdx, setActiveIdx] = useState(state.activeIdx ?? 0);
 
   const doneSet = new Set([...DONE_CATEGORIES, ...(entries.some((e) => e.company) ? ['경력인턴' as CategoryKey] : [])]);
@@ -266,6 +297,22 @@ export default function ExperienceEditPage() {
   const categoryIdx = CATEGORIES.findIndex((c) => c.key === activeCategory);
   const prevCategory = CATEGORIES[categoryIdx - 1]?.key;
   const nextCategory = CATEGORIES[categoryIdx + 1]?.key;
+
+  const handleSave = (silent = false) => {
+    localStorage.setItem(dbKey, JSON.stringify(entries));
+    if (!silent) {
+      alert('경험사항이 성공적으로 저장되었습니다!');
+    }
+  };
+
+  const handleSaveAndNext = () => {
+    handleSave(true);
+    if (nextCategory) {
+      setActiveCategory(nextCategory);
+    } else {
+      navigate(ROUTES.MYPAGE);
+    }
+  };
 
   return (
     <div className={styles.page}>
@@ -353,10 +400,10 @@ export default function ExperienceEditPage() {
             ← 이전
           </button>
           <div className={styles.actionRight}>
-            <button className={styles.saveBtn}>임시저장</button>
+            <button className={styles.saveBtn} onClick={() => handleSave(false)}>임시저장</button>
             <button
               className={styles.nextBtn}
-              onClick={() => nextCategory ? setActiveCategory(nextCategory) : navigate(ROUTES.MYPAGE)}
+              onClick={handleSaveAndNext}
             >
               저장 후 다음 →
             </button>

@@ -1,4 +1,4 @@
-import { Outlet, NavLink, Link } from 'react-router-dom';
+import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../constants';
 import {
   LayoutDashboard,
@@ -7,6 +7,7 @@ import {
   MessageSquare,
   User,
   Building2,
+  LogOut,
 } from 'lucide-react';
 import styles from './MainLayout.module.css';
 
@@ -20,6 +21,30 @@ const navItems = [
 ];
 
 export default function MainLayout() {
+  const navigate = useNavigate();
+
+  // localStorage에서 로그인된 사용자 정보 동적 로드
+  const userStr = localStorage.getItem('user');
+  let userName = '이성재';
+  let userRole = '프론트엔드 개발자';
+  let avatarText = 'SJ';
+
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      userName = user.name || user.email || '사용자';
+      userRole = user.role || '취업 준비생';
+      avatarText = userName.slice(0, 2).toUpperCase();
+    } catch (e) {
+      console.error('Failed to parse user session:', e);
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    navigate(ROUTES.LOGIN);
+  };
+
   return (
     <div className={styles.layout}>
       <aside className={styles.sidebar}>
@@ -50,11 +75,14 @@ export default function MainLayout() {
         </nav>
 
         <div className={styles.userBox}>
-          <div className={styles.userAvatar}>SJ</div>
+          <div className={styles.userAvatar}>{avatarText}</div>
           <div className={styles.userInfo}>
-            <p className={styles.userName}>이성재</p>
-            <p className={styles.userRole}>프론트엔드 개발자</p>
+            <p className={styles.userName} title={userName}>{userName}</p>
+            <p className={styles.userRole} title={userRole}>{userRole}</p>
           </div>
+          <button onClick={handleLogout} className={styles.logoutBtn} title="로그아웃">
+            <LogOut size={16} />
+          </button>
         </div>
       </aside>
 

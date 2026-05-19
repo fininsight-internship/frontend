@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ROUTES } from '../../constants';
+import api from '../../services/api';
 import styles from './Login.module.css';
 
 export default function LoginPage() {
@@ -15,11 +16,21 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      // TODO: connect real auth
-      await new Promise((r) => setTimeout(r, 600));
+      const response = await api.post('/auth/login', {
+        email: email,
+        password: password,
+      });
+
+      console.log('✅ Login Success:', response.data);
+      if (response.data?.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+
       navigate(ROUTES.HOME);
-    } catch {
-      setError('이메일 또는 비밀번호를 확인해주세요.');
+    } catch (err: any) {
+      console.error('❌ Login API Error:', err);
+      const errMsg = err.response?.data?.detail || '이메일 또는 비밀번호를 확인해주세요.';
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
