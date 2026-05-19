@@ -19,6 +19,8 @@ import CompanyPage from './pages/Company_JD/index.tsx';
 import LandingPage from './pages/Landing/index.tsx';
 import LoginPage from './pages/Login/index.tsx';
 import SignupPage from './pages/Signup/index.tsx';
+import InterviewHome from './pages/Interview/InterviewHome.tsx';
+import InterviewDetail from './pages/Interview/InterviewDetail.tsx';
 
 function App() {
   return (
@@ -34,6 +36,8 @@ function App() {
           <Route path={ROUTES.INTERVIEW} element={<InterviewPage />} />
           <Route path={ROUTES.MYPAGE} element={<MyPage />} />
           <Route path={ROUTES.COMPANY} element={<CompanyPage />} />
+          <Route path={ROUTES.INTERVIEW} element={<InterviewHome />} />
+          <Route path={ROUTES.INTERVIEW_DETAIL} element={<InterviewDetail />} />
         </Route>
         <Route path="/resume/editor" element={<ResumeEditorPage />} />
         <Route path="/experience/edit" element={<ExperienceEditPage />} />
