@@ -1,3 +1,18 @@
-// Store placeholder
-// 추후 로그인 기능 추가 시 Zustand store를 여기에 작성합니다.
-export {};
+import { create } from 'zustand';
+import type { User } from '../types';
+
+interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  isAuthenticated: boolean;
+  setAuth: (user: User, accessToken: string) => void;
+  clearAuth: () => void;
+}
+
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  accessToken: null,
+  isAuthenticated: false,
+  setAuth: (user, accessToken) => set({ user, accessToken, isAuthenticated: true }),
+  clearAuth: () => set({ user: null, accessToken: null, isAuthenticated: false }),
+}));

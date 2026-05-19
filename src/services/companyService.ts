@@ -1,9 +1,7 @@
-import api from './api';
-import type { CompanyReport } from '../types';
+import axios from "axios";
 
-export const companyService = {
-  getReport: async (company: string): Promise<CompanyReport> => {
-    const { data } = await api.post('/company/report', { company });
-    return data;
-  },
+export const getCompanyReport = (company: string, job?: string) => {
+  return axios.get("http://localhost:8000/company/report", {
+    params: { company, job },
+  });
 };
