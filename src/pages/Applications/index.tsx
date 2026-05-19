@@ -42,8 +42,19 @@ export default function ApplicationsPage() {
 
   const handleCardClick = (app: Application) => {
     if (app.jd !== 'done') navigate(ROUTES.ANALYSIS);
-    else if (app.resume !== 'done') navigate(ROUTES.RESUME);
-    else navigate(ROUTES.INTERVIEW);
+    else if (app.resume === 'waiting') navigate(ROUTES.RESUME);
+    else if (app.resume === 'in_progress' || app.resume === 'done') {
+      navigate('/resume/editor', {
+        state: {
+          companyName: app.company,
+          jobTitle: app.role,
+          coverQuestions: [],
+          drafts: {},
+          companyInsights: '',
+          selections: [],
+        },
+      });
+    } else navigate(ROUTES.INTERVIEW);
   };
 
   return (
@@ -85,19 +96,28 @@ export default function ApplicationsPage() {
             <div className={styles.pipeline} onClick={(e) => e.stopPropagation()}>
               <div className={styles.pipelineItem}>
                 <span className={styles.pipelineLabel}>JD분석</span>
-                <button className={`${styles.statusBtn} ${styles[STATUS_CLASS[app.jd]]}`}>
+                <button
+                  className={`${styles.statusBtn} ${styles[STATUS_CLASS[app.jd]]}`}
+                  onClick={(e) => { e.stopPropagation(); navigate(ROUTES.ANALYSIS); }}
+                >
                   {JD_LABEL[app.jd]}
                 </button>
               </div>
               <div className={styles.pipelineItem}>
                 <span className={styles.pipelineLabel}>자소서</span>
-                <button className={`${styles.statusBtn} ${styles[STATUS_CLASS[app.resume]]}`}>
+                <button
+                  className={`${styles.statusBtn} ${styles[STATUS_CLASS[app.resume]]}`}
+                  onClick={(e) => { e.stopPropagation(); navigate(ROUTES.RESUME); }}
+                >
                   {RESUME_LABEL[app.resume]}
                 </button>
               </div>
               <div className={styles.pipelineItem}>
                 <span className={styles.pipelineLabel}>면접</span>
-                <button className={`${styles.statusBtn} ${styles[STATUS_CLASS[app.interview]]}`}>
+                <button
+                  className={`${styles.statusBtn} ${styles[STATUS_CLASS[app.interview]]}`}
+                  onClick={(e) => { e.stopPropagation(); navigate(ROUTES.INTERVIEW); }}
+                >
                   {INTERVIEW_LABEL[app.interview]}
                 </button>
               </div>
