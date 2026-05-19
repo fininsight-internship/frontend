@@ -120,7 +120,7 @@ export default function ResumePage() {
   // ─── Setup data ───────────────────────────────────────────────
   const [companyName, setCompanyName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
-  const [coverQuestions, setCoverQuestions] = useState<string[]>(['']);
+  const [coverQuestions, setCoverQuestions] = useState<{ text: string; charLimit: string }[]>([{ text: '', charLimit: '' }]);
   const [companyInsights, setCompanyInsights] = useState('');
   const [currentQuestionIdx] = useState(0);
 
@@ -140,6 +140,7 @@ export default function ResumePage() {
   const [coverSelections, setCoverSelections] = useState<string[]>([]);
   const [coverLoading, setCoverLoading] = useState(false);
   const [finalLetter, setFinalLetter] = useState('');
+  const [draftLetter, setDraftLetter] = useState(''); // 진행 중인 자소서
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -155,7 +156,8 @@ export default function ResumePage() {
     : wizardStep === 'step4' || wizardStep === 'done' ? 4
     : 0;
 
-  const currentCoverQ = coverQuestions[currentQuestionIdx] || '';
+  const currentCoverQ = coverQuestions[currentQuestionIdx]?.text || '';
+  const currentCharLimit = parseInt(coverQuestions[currentQuestionIdx]?.charLimit || '0', 10) || 0;
 
   const getStarData = (): Record<string, string> => {
     if (selectedExp?.hasDetail && selectedExp.starData) return selectedExp.starData as Record<string, string>;
@@ -183,16 +185,16 @@ export default function ResumePage() {
   };
 
   const handleStartWizard = () => {
-    if (coverQuestions.some((q) => q.trim())) {
+    if (coverQuestions.some((q) => q.text.trim())) {
       setWizardStep('step1');
     }
   };
 
-  const addQuestion = () => setCoverQuestions([...coverQuestions, '']);
+  const addQuestion = () => setCoverQuestions([...coverQuestions, { text: '', charLimit: '' }]);
   const removeQuestion = (i: number) => setCoverQuestions(coverQuestions.filter((_, j) => j !== i));
-  const updateQuestion = (i: number, val: string) => {
+  const updateQuestion = (i: number, field: 'text' | 'charLimit', val: string) => {
     const next = [...coverQuestions];
-    next[i] = val;
+    next[i] = { ...next[i], [field]: val };
     setCoverQuestions(next);
   };
 
@@ -277,6 +279,7 @@ export default function ResumePage() {
     setCoverSelections([]);
     setCoverInput('');
     setFinalLetter('');
+    setDraftLetter('');
     setCoverLoading(true);
     try {
       const res = await api.post('/resume/cover-chat', {
@@ -300,6 +303,14 @@ export default function ResumePage() {
     }
   };
 
+  const typeLetterAnimation = async (letter: string) => {
+    setDraftLetter('');
+    for (let i = 0; i < letter.length; i++) {
+      setDraftLetter((prev) => prev + letter[i]);
+      await new Promise((resolve) => setTimeout(resolve, 15));
+    }
+  };
+
   const handleCoverSend = async (text: string) => {
     if (!text.trim() || coverLoading) return;
     const newMessages: CoverMessage[] = [...coverMessages, { role: 'user', content: text }];
@@ -310,46 +321,55 @@ export default function ResumePage() {
     setCoverLoading(true);
     try {
       const apiHistory = newMessages.map((m) => ({ role: m.role, content: m.content }));
-      const res = await api.post('/resume/cover-chat', {
-        company_name: companyName,
-        job_title: jobTitle,
-        cover_question: currentCoverQ,
-        star_data: getStarData(),
-        history: apiHistory,
-        company_insights: companyInsights,
-      });
 
-      if (res.data.is_complete) {
-        const finalRes = await api.post('/resume/cover-finalize', {
+      // cover-chat + cover-finalize 동시 호출
+      const [chatRes, draftRes] = await Promise.all([
+        api.post('/resume/cover-chat', {
           company_name: companyName,
           job_title: jobTitle,
           cover_question: currentCoverQ,
+          char_limit: currentCharLimit,
+          star_data: getStarData(),
+          history: apiHistory,
+          company_insights: companyInsights,
+        }),
+        api.post('/resume/cover-finalize', {
+          company_name: companyName,
+          job_title: jobTitle,
+          cover_question: currentCoverQ,
+          char_limit: currentCharLimit,
           star_data: getStarData(),
           selections: newSelections,
           company_insights: companyInsights,
-        });
-        const letter = finalRes.data.final_letter || '';
-        setFinalLetter(letter);
-        setCoverMessages((prev) => [...prev, { role: 'assistant', content: '✅ 자소서 작성이 완료됐습니다! 에디터로 이동합니다...' }]);
+        }),
+      ]);
+
+      // 중간 초안 타이핑 애니메이션 (백그라운드)
+      const draft = draftRes.data.final_letter || '';
+      typeLetterAnimation(draft);
+
+      if (chatRes.data.is_complete) {
+        setFinalLetter(draft);
+        setCoverMessages((prev) => [...prev, { role: 'assistant', content: '✅ 자소서 작성 완료! 에디터에서 수정할 수 있어요.' }]);
+        setWizardStep('done');
         setTimeout(() => {
           navigate('/resume/editor', {
             state: {
               companyName,
               jobTitle,
-              coverQuestions,
-              drafts: { [currentQuestionIdx]: letter },
+              coverQuestions: coverQuestions.map((q) => q.text),
+              drafts: { [currentQuestionIdx]: draft },
               companyInsights,
               selections: newSelections,
             },
           });
-        }, 800);
-        setWizardStep('done');
+        }, 1500);
       } else {
         setCoverMessages((prev) => [...prev, {
           role: 'assistant',
-          content: res.data.question,
-          options: res.data.options,
-          aspect: res.data.aspect,
+          content: chatRes.data.question,
+          options: chatRes.data.options,
+          aspect: chatRes.data.aspect,
         }]);
       }
     } catch (_) {
@@ -435,9 +455,17 @@ export default function ResumePage() {
                   <input
                     type="text"
                     className={styles.input}
-                    placeholder={`예) 지원 동기 및 포부를 작성하세요. (1000자)`}
-                    value={q}
-                    onChange={(e) => updateQuestion(i, e.target.value)}
+                    placeholder="예) 지원 동기 및 포부를 작성하세요."
+                    value={q.text}
+                    onChange={(e) => updateQuestion(i, 'text', e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    className={styles.charLimitInput}
+                    placeholder="글자 수"
+                    value={q.charLimit}
+                    onChange={(e) => updateQuestion(i, 'charLimit', e.target.value)}
+                    min={0}
                   />
                   {coverQuestions.length > 1 && (
                     <button className={styles.deleteBtn} onClick={() => removeQuestion(i)}>
@@ -450,7 +478,7 @@ export default function ResumePage() {
                 <Plus size={16} /> 문항 추가
               </button>
             </div>
-            <button className={styles.primaryBtn} onClick={handleStartWizard} disabled={!coverQuestions.some((q) => q.trim())}>
+            <button className={styles.primaryBtn} onClick={handleStartWizard} disabled={!coverQuestions.some((q) => q.text.trim())}>
               자소서 작성 시작
             </button>
           </div>
@@ -678,97 +706,119 @@ export default function ResumePage() {
 
         {/* Step 4: Cover letter chat */}
         {(wizardStep === 'step4' || wizardStep === 'done') && (
-          <div className={styles.chatView}>
-            {wizardStep !== 'done' && (
-              <div className={styles.chatBadge}>
-                <CheckCircle size={14} color="var(--color-success)" />
-                <span>경험 확인 완료 — 이제 자소서를 작성합니다</span>
+          <div className={styles.coverLetterView}>
+            {/* Left: Cover letter draft */}
+            <div className={styles.coverLetterContent}>
+              <div className={styles.coverLetterHeader}>
+                <h3 className={styles.coverLetterHeaderTitle}>자소서 작성 중</h3>
+                <p className={styles.coverLetterHeaderQuestion}>Q. {currentCoverQ}</p>
               </div>
-            )}
 
-            <div className={styles.chatMessages}>
-              {coverMessages.length === 0 && coverLoading && (
-                <div className={styles.aiMessage}>
-                  <div className={styles.aiAvatar}>AI</div>
-                  <div className={styles.aiCard}>
-                    <Loader2 size={16} className={styles.spinner} /> 자소서 질문을 준비하고 있어요...
+              {draftLetter ? (
+                <div className={styles.finalLetterCard}>
+                  <div className={styles.finalLetterContent}>
+                    {draftLetter}
+                    {!finalLetter && <span className={styles.blinkCursor}>|</span>}
                   </div>
-                </div>
-              )}
-
-              {coverMessages.map((msg, i) => (
-                <div key={i}>
-                  {msg.role === 'assistant' ? (
-                    <div className={styles.aiMessage}>
-                      <div className={styles.aiAvatar}>AI</div>
-                      <div className={styles.aiCard}>
-                        <div className={styles.aiMeta}>
-                          <span className={styles.aiName}>CareerAI 멘토</span>
-                          {msg.aspect && <span className={styles.stepBadge}>{msg.aspect}</span>}
-                        </div>
-                        <p>{msg.content}</p>
-                        {msg.options && msg.options.length > 0 && (
-                          <div className={styles.optionGrid}>
-                            {msg.options.map((opt, j) => (
-                              <button
-                                key={j}
-                                className={styles.optionCard}
-                                onClick={() => handleCoverSend(opt)}
-                                disabled={coverLoading || i < coverMessages.length - 1}
-                              >
-                                <span className={styles.optionNum}>{j + 1}</span>
-                                <span>{opt}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={styles.userMessage}>
-                      <div className={styles.userBubble}>{msg.content}</div>
-                    </div>
+                  {finalLetter && (
+                    <button className={styles.primaryBtn} onClick={() => navigator.clipboard.writeText(finalLetter)}>
+                      자소서 복사하기
+                    </button>
                   )}
                 </div>
-              ))}
-
-              {coverLoading && coverMessages.length > 0 && (
-                <div className={styles.aiMessage}>
-                  <div className={styles.aiAvatar}>AI</div>
-                  <div className={styles.aiCard}>
-                    <Loader2 size={16} className={styles.spinner} />
-                  </div>
+              ) : (
+                <div className={styles.draftPlaceholder}>
+                  <p>자소서가 여기에 작성됩니다</p>
+                  <p className={styles.draftPlaceholderText}>
+                    우측 채팅창에서 AI의 질문에 답변하면<br />
+                    AI가 자소서를 실시간으로 작성합니다
+                  </p>
                 </div>
               )}
-              <div ref={chatEndRef} />
             </div>
 
-            {wizardStep === 'done' && finalLetter && (
-              <div className={styles.finalLetterCard}>
-                <h3 className={styles.finalLetterTitle}>✅ 완성된 자소서</h3>
-                <div className={styles.finalLetterQuestion}>Q. {currentCoverQ}</div>
-                <p className={styles.finalLetterBody}>{finalLetter}</p>
-                <button className={styles.primaryBtn} onClick={() => navigator.clipboard.writeText(finalLetter)}>
-                  자소서 복사하기
-                </button>
-              </div>
-            )}
+            {/* Right: Chat sidebar */}
+            <div className={styles.chatSidebar}>
+              {wizardStep !== 'done' && (
+                <div className={styles.chatBadge}>
+                  <CheckCircle size={14} color="var(--color-success)" />
+                  <span>자소서 작성 중</span>
+                </div>
+              )}
 
-            {wizardStep === 'step4' && !coverLoading && (
-              <div className={styles.chatInputBar}>
-                <textarea
-                  className={styles.chatTextarea}
-                  placeholder="위 보기를 선택하거나 직접 입력하세요..."
-                  value={coverInput}
-                  onChange={(e) => setCoverInput(e.target.value)}
-                  onKeyDown={handleCoverKey}
-                  rows={2}
-                />
-                <button className={styles.sendBtn} onClick={() => handleCoverSend(coverInput)} disabled={!coverInput.trim()}>
-                  <Send size={18} />
-                </button>
+              <div className={styles.chatMessages}>
+                {coverMessages.length === 0 && coverLoading && (
+                  <div className={styles.aiMessage}>
+                    <div className={styles.aiAvatar}>AI</div>
+                    <div className={styles.aiCard}>
+                      <Loader2 size={16} className={styles.spinner} /> 질문을 준비하고 있어요...
+                    </div>
+                  </div>
+                )}
+
+                {coverMessages.map((msg, i) => (
+                  <div key={i}>
+                    {msg.role === 'assistant' ? (
+                      <div className={styles.aiMessage}>
+                        <div className={styles.aiAvatar}>AI</div>
+                        <div className={styles.aiCard}>
+                          <div className={styles.aiMeta}>
+                            <span className={styles.aiName}>CareerAI</span>
+                            {msg.aspect && <span className={styles.stepBadge}>{msg.aspect}</span>}
+                          </div>
+                          <p>{msg.content}</p>
+                          {msg.options && msg.options.length > 0 && (
+                            <div className={styles.optionGrid}>
+                              {msg.options.map((opt, j) => (
+                                <button
+                                  key={j}
+                                  className={styles.optionCard}
+                                  onClick={() => handleCoverSend(opt)}
+                                  disabled={coverLoading || i < coverMessages.length - 1}
+                                >
+                                  <span className={styles.optionNum}>{j + 1}</span>
+                                  <span>{opt}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={styles.userMessage}>
+                        <div className={styles.userBubble}>{msg.content}</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {coverLoading && coverMessages.length > 0 && (
+                  <div className={styles.aiMessage}>
+                    <div className={styles.aiAvatar}>AI</div>
+                    <div className={styles.aiCard}>
+                      <Loader2 size={16} className={styles.spinner} />
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
               </div>
-            )}
+
+              {wizardStep === 'step4' && !coverLoading && (
+                <div className={styles.chatInputBar}>
+                  <textarea
+                    className={styles.chatTextarea}
+                    placeholder="위 보기를 선택하거나 직접 입력하세요..."
+                    value={coverInput}
+                    onChange={(e) => setCoverInput(e.target.value)}
+                    onKeyDown={handleCoverKey}
+                    rows={2}
+                  />
+                  <button className={styles.sendBtn} onClick={() => handleCoverSend(coverInput)} disabled={!coverInput.trim()}>
+                    <Send size={18} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
