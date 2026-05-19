@@ -12,4 +12,5 @@ export const ROUTES = {
   INTERVIEW: '/interview',
   MYPAGE: '/mypage',
   APPLICATIONS: '/applications',
+  COMPANY: '/company',
 } as const;

@@ -15,6 +15,7 @@ import ExperienceEditPage from './pages/ExperienceEdit/index.tsx';
 import ApplicationsPage from './pages/Applications/index.tsx';
 import InterviewPage from './pages/Interview/index.tsx';
 import MyPage from './pages/MyPage/index.tsx';
+import CompanyPage from './pages/Company_JD/index.tsx';
 import LandingPage from './pages/Landing/index.tsx';
 import LoginPage from './pages/Login/index.tsx';
 import SignupPage from './pages/Signup/index.tsx';
@@ -32,6 +33,7 @@ function App() {
           <Route path={ROUTES.APPLICATIONS} element={<ApplicationsPage />} />
           <Route path={ROUTES.INTERVIEW} element={<InterviewPage />} />
           <Route path={ROUTES.MYPAGE} element={<MyPage />} />
+          <Route path={ROUTES.COMPANY} element={<CompanyPage />} />
         </Route>
         <Route path="/resume/editor" element={<ResumeEditorPage />} />
         <Route path="/experience/edit" element={<ExperienceEditPage />} />

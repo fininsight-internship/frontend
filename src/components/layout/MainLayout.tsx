@@ -6,11 +6,13 @@ import {
   FileEdit,
   MessageSquare,
   User,
+  Building2,
 } from 'lucide-react';
 import styles from './MainLayout.module.css';
 
 const navItems = [
   { path: ROUTES.HOME, label: '대시보드', icon: LayoutDashboard },
+  { path: ROUTES.COMPANY, label: '기업 분석', icon: Building2 },
   { path: ROUTES.APPLICATIONS, label: '지원 현황', icon: ClipboardList },
   { path: ROUTES.RESUME, label: '자기소개서', icon: FileEdit },
   { path: ROUTES.INTERVIEW, label: '면접 연습', icon: MessageSquare },
