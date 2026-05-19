@@ -41,20 +41,7 @@ export default function ApplicationsPage() {
   );
 
   const handleCardClick = (app: Application) => {
-    if (app.jd !== 'done') navigate(ROUTES.ANALYSIS);
-    else if (app.resume === 'waiting') navigate(ROUTES.RESUME);
-    else if (app.resume === 'in_progress' || app.resume === 'done') {
-      navigate('/resume/editor', {
-        state: {
-          companyName: app.company,
-          jobTitle: app.role,
-          coverQuestions: [],
-          drafts: {},
-          companyInsights: '',
-          selections: [],
-        },
-      });
-    } else navigate(ROUTES.INTERVIEW);
+    navigate(ROUTES.APPLICATION_DETAIL, { state: { app } });
   };
 
   return (

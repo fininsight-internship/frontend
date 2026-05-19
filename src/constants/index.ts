@@ -10,6 +10,7 @@ export const ROUTES = {
   ANALYSIS_REPORT: '/analysis/report',
   RESUME: '/resume',
   APPLICATIONS: '/applications',
+  APPLICATION_DETAIL: '/applications/detail',
   INTERVIEW: '/interview',
   INTERVIEW_DETAIL: '/interview/:id',
   MYPAGE: '/mypage',
