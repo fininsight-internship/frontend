@@ -162,7 +162,7 @@ export default function InterviewHome() {
           </div>
         ) : (
           <div className={styles.sessionList}>
-            {sessions.map((item, i) => (
+            {sessions.map((item) => (
               <div key={item.id} className={styles.sessionItem}>
                 <div className={styles.sessionTop}>
                   <div className={styles.sessionCompanyInfo}>
