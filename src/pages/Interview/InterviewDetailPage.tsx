@@ -29,7 +29,7 @@ export default function InterviewDetailPage() {
   const [loadingFeedback, setLoadingFeedback] = useState<Record<string, boolean>>({});
   const [loadingFollowUp, setLoadingFollowUp] = useState<Record<string, boolean>>({});
   
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
   const [showAxes, setShowAxes] = useState(false);
 
   if (!state) {
@@ -142,8 +142,7 @@ export default function InterviewDetailPage() {
 
   const handleSave = async () => {
     try {
-      const res = await interviewService.saveSession(position.company, position.job_role, questions, state.sessionId, axesUsed);
-      setSaveSuccess(res.message);
+      await interviewService.saveSession(position.company, position.job_role, questions, state.sessionId, axesUsed);
       alert('저장되었습니다! 면접 목록으로 이동합니다.');
       navigate(ROUTES.INTERVIEW);
     } catch {
