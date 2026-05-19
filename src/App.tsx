@@ -13,7 +13,8 @@ import ResumePage from './pages/Resume/index.tsx';
 import ResumeEditorPage from './pages/ResumeEditor/index.tsx';
 import ExperienceEditPage from './pages/ExperienceEdit/index.tsx';
 import ApplicationsPage from './pages/Applications/index.tsx';
-import InterviewPage from './pages/Interview/index.tsx';
+import InterviewPage from './pages/Interview/InterviewPage.tsx';
+import InterviewDetailPage from './pages/Interview/InterviewDetailPage.tsx';
 import MyPage from './pages/MyPage/index.tsx';
 import CompanyPage from './pages/Company_JD/index.tsx';
 import LandingPage from './pages/Landing/index.tsx';
@@ -32,6 +33,7 @@ function App() {
           <Route path={ROUTES.RESUME} element={<ResumePage />} />
           <Route path={ROUTES.APPLICATIONS} element={<ApplicationsPage />} />
           <Route path={ROUTES.INTERVIEW} element={<InterviewPage />} />
+          <Route path={ROUTES.INTERVIEW_DETAIL} element={<InterviewDetailPage />} />
           <Route path={ROUTES.MYPAGE} element={<MyPage />} />
           <Route path={ROUTES.COMPANY} element={<CompanyPage />} />
         </Route>

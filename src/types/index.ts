@@ -61,20 +61,102 @@ export interface ResumeGenerateRequest {
 }
 
 // ────────────────────────────────────────────
-// Interview
+// Interview — RAG + 평가축 기반
 // ────────────────────────────────────────────
+
+/** 지원 가능 포지션 (서비스 내 분석 완료된 기업-직무) */
+export interface AvailablePosition {
+  id: string;
+  company: string;
+  job_role: string;
+  description: string;
+  required_skills: string[];
+  company_culture: string;
+  doc_ids: string[];
+}
+
+/** 평가축 (feature taxonomy 기반) */
+export interface EvaluationAxis {
+  key: string;
+  name: string;
+  description: string;
+  weight: number;
+}
+
+/** 평가축 추론 결과 */
+export interface EvaluateAxesResponse {
+  company: string;
+  job_role: string;
+  evaluation_axes: EvaluationAxis[];
+  sources: { id: string; label: string }[];
+  note: string;
+}
+
+/** 답변 감점 리스크 */
+export interface RiskPoint {
+  issue: string;
+  reason: string;
+  axis?: string;
+}
+
+/** 답변 피드백 */
+export interface AnswerFeedback {
+  overall_score: number;
+  strengths: string[];
+  risk_points: RiskPoint[];
+  improvement: string;
+  follow_up_hint: string;
+}
+
 export interface InterviewQuestion {
   id: string;
   question: string;
-  category: 'behavioral' | 'technical' | 'situational';
+  category: string;
   tips: string;
+  evaluation_axis?: string;
+  axis_name?: string;
+  axis_weight?: number;
+  userAnswer?: string;
+  feedback?: AnswerFeedback;
+  followUps?: FollowUpQuestion[];
+}
+
+export interface QuestionsResponse {
+  questions: InterviewQuestion[];
+  feature_weights: Record<string, number>;
+  sources: { id: string; label: string }[];
+  axes_used: EvaluationAxis[];
 }
 
 export interface InterviewSession {
   id: string;
   company: string;
-  questions: InterviewQuestion[];
-  createdAt: string;
+  job_role: string;
+  answers: InterviewQuestion[];
+  axes_used?: EvaluationAxis[];
+  created_at: string;
+  stats?: {
+    total_questions: number;
+    answered_questions: number;
+    score: number | null;
+  };
+}
+
+/** 압박 꼬리질문 */
+export interface FollowUpQuestion {
+  question: string;
+  intent: string;
+  userAnswer?: string;
+  feedback?: string;
+  isLoading?: boolean;
+}
+
+// 하위 호환용
+export interface MockContextResponse {
+  id: string;
+  jd: { jobTitle: string; requiredSkills: string[]; summary: string };
+  company_analysis: { company: string; summary: string; culture: string };
+  resume: { content: string };
 }
 
 // ────────────────────────────────────────────
