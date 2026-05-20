@@ -60,12 +60,23 @@ function InterviewBadge({ status }: { status: InterviewStatus }) {
 }
 
 export default function HomePage() {
+  const userStr = localStorage.getItem('user');
+  let displayName = '사용자';
+
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      displayName = user.nickname || user.name || user.email || '사용자';
+    } catch (e) {
+      console.error('Failed to parse user session:', e);
+    }
+  }
 
   return (
     <div className={styles.page}>
       {/* Greeting */}
       <div className={styles.greeting}>
-        <h1 className={styles.greetingTitle}>안녕하세요, 이성재 님 👋</h1>
+        <h1 className={styles.greetingTitle}>안녕하세요, {displayName} 님 👋</h1>
         <p className={styles.greetingSubtitle}>오늘도 취업 준비 화이팅! 현재 {COMPANIES.length}개 기업 준비 중입니다.</p>
       </div>
 

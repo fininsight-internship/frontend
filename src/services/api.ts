@@ -49,4 +49,28 @@ const api = axios.create({
   },
 });
 
+// Request interceptor to automatically attach current user headers if logged in
+api.interceptors.request.use(
+  (config) => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user) {
+          if (user.id) {
+            config.headers['X-User-Id'] = String(user.id);
+          }
+          if (user.email) {
+            config.headers['X-User-Email'] = user.email;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse user in api interceptor:', e);
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 export default api;
