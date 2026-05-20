@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
 import { 
   CheckCircle, 
   Circle, 
@@ -102,46 +103,31 @@ const CATEGORY_LABELS: Record<CategoryKey, string> = {
   기타경험: '기타 경험 사항',
 };
 
-// ─── Premium Mock/Default Experience State ───────────────────────
+// ─── Empty Default State (빈 양식 — 데모 데이터 없음) ─────────────
 const DEFAULT_STATE: ExperienceState = {
-  기본정보: {
-    name: '김민준',
-    engName: 'Minjun Kim',
-    birthDate: '1998-05-20',
-    education: [
-      { schoolName: '서울대학교 컴퓨터공학전공', admissionDate: '2017-03-02', graduationDate: '2023-02-24' }
-    ]
-  },
-  자격증상: [
-    { id: '1', name: '정보처리기사', date: '2023-06-30', organization: '한국산업인력공단' },
-    { id: '2', name: '전국 대학생 알고리즘 경진대회 은상', date: '2022-11-25', organization: '과학기술정보통신부' }
-  ],
-  경력인턴: [
-    { 
-      id: '1', 
-      company: '네이버 주식회사', 
-      department: '검색플랫폼 CIC 프론트엔드팀', 
-      startDate: '2024-07-01', 
-      endDate: '2024-08-31', 
-      detail: 'React Query를 도입해 불필요한 API 호출을 60% 절감하고 초기 렌더링 최적화를 완료했습니다. 또한 모듈성 향상을 위해 사내 공통 컴포넌트 라이브러리 개발에 기여했습니다.' 
-    }
-  ],
-  교육부트캠프: [
-    { id: '1', name: '우아한테크코스 5기', topic: '프론트엔드 모던 웹 아키텍처 과정', detail: '10개월간 현업 개발 프로세스에 입각한 웹 애플리케이션 프로젝트 리팩토링 및 웹 표준 스터디를 주도했습니다.' }
-  ],
-  프로젝트: [
-    { id: '1', title: '실시간 취업 코칭 플랫폼 CareerAI', detail: 'Vite, React, TypeScript를 접목해 이력서 RAG 매칭 및 피드백 전용 서비스 대시보드를 전면 설계했습니다.' }
-  ],
-  동아리: [
-    { id: '1', title: '컴퓨터 학술 동아리 SCSA', detail: '주 1회 알고리즘 모의 테스트 및 문제 풀이 세션을 주최하여 부원들의 문제 해결 능력 성장을 도왔습니다.' }
-  ],
-  봉사활동: [
-    { id: '1', title: '지역 다문화가정 아동 소프트웨어 교육 봉사', detail: '소외계층 아동을 대상으로 주말 스크래치 및 엔트리 블록 코딩 기초 멘토링 강사로 활동했습니다.' }
-  ],
-  기타경험: [
-    { id: '1', title: '오픈소스 프로젝트 PR 기여', detail: 'React 기반 오픈소스 레포지토리의 컴포넌트 문서 영문 교정 및 예외 처리 PR 3건을 머지시켰습니다.' }
-  ]
+  기본정보: { name: '', engName: '', birthDate: '', education: [{ schoolName: '', admissionDate: '', graduationDate: '' }] },
+  자격증상: [{ id: '1', name: '', date: '', organization: '' }],
+  경력인턴: [{ id: '1', company: '', department: '', startDate: '', endDate: '', detail: '' }],
+  교육부트캠프: [{ id: '1', name: '', topic: '', detail: '' }],
+  프로젝트: [{ id: '1', title: '', detail: '' }],
+  동아리: [{ id: '1', title: '', detail: '' }],
+  봉사활동: [{ id: '1', title: '', detail: '' }],
+  기타경험: [{ id: '1', title: '', detail: '' }],
 };
+
+// DB 응답 정규화: 빈 배열인 카테고리에 빈 항목 1개 추가 (form input이 작동하려면 최소 1개 필요)
+function normalizeProfile(data: Partial<ExperienceState>): ExperienceState {
+  return {
+    기본정보: data.기본정보 ?? DEFAULT_STATE.기본정보,
+    자격증상: data.자격증상 ?? [],
+    경력인턴: data.경력인턴?.length ? data.경력인턴 : [{ id: '1', company: '', department: '', startDate: '', endDate: '', detail: '' }],
+    교육부트캠프: data.교육부트캠프?.length ? data.교육부트캠프 : [{ id: '1', name: '', topic: '', detail: '' }],
+    프로젝트: data.프로젝트?.length ? data.프로젝트 : [{ id: '1', title: '', detail: '' }],
+    동아리: data.동아리?.length ? data.동아리 : [{ id: '1', title: '', detail: '' }],
+    봉사활동: data.봉사활동?.length ? data.봉사활동 : [{ id: '1', title: '', detail: '' }],
+    기타경험: data.기타경험?.length ? data.기타경험 : [{ id: '1', title: '', detail: '' }],
+  };
+}
 
 // ─── Component: AI Notice Banner ──────────────────────────────────
 function AICoverLetterNotice() {
@@ -165,9 +151,8 @@ export default function ExperienceEditPage() {
   const navigate = useNavigate();
   const state = (location.state || {}) as LocationState;
 
-  // 1. Storage Key Mapped to current logged-in user
-  const userStr = localStorage.getItem('user');
-  const user = userStr ? JSON.parse(userStr) : null;
+  // 1. 계정 전환 시 즉시 반영되도록 authStore에서 user를 가져옴
+  const { user } = useAuthStore();
   const dbKey = user ? `experience_profile_${user.id}` : 'experience_profile_guest';
 
   // 2. Load stored experience state
@@ -175,7 +160,7 @@ export default function ExperienceEditPage() {
     const saved = localStorage.getItem(dbKey);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        return normalizeProfile(JSON.parse(saved));
       } catch (e) {
         console.error('Failed to parse experience profile:', e);
       }
@@ -185,26 +170,31 @@ export default function ExperienceEditPage() {
 
   const fromSignup = state.fromSignup ?? false;
   const [activeCategory, setActiveCategory] = useState<CategoryKey>(state.category || '기본정보');
-  const [profile, setProfile] = useState<ExperienceState>(loadSavedState());
+  const [profile, setProfile] = useState<ExperienceState>(DEFAULT_STATE);
+  const [profileReady, setProfileReady] = useState(false);
   const [activeCommonIdx, setActiveCommonIdx] = useState(0);
 
-  // 3. GET API Sync on page load (실시간 DB 로드)
+  // 3. DB에서 경험 데이터 로드 (DB가 항상 소스 오브 트루스)
   useEffect(() => {
     const fetchExperienceFromDB = async () => {
       try {
         const res = await api.get('/experience');
         if (res.data) {
-          // 서버 데이터가 비어있지 않다면 상태와 로컬 스케줄러 동기화
-          setProfile(res.data);
-          localStorage.setItem(dbKey, JSON.stringify(res.data));
-          console.log('📬 [DB Sync] 데이터베이스에서 경험 스펙을 안전하게 동기화 완료했습니다.');
+          const normalized = normalizeProfile(res.data);
+          setProfile(normalized);
+          localStorage.setItem(dbKey, JSON.stringify(normalized));
         }
       } catch (err) {
-        console.warn('⚠️ [DB Sync] 서버 연동 실패 (로컬 스토리지 데이터로 임시 동작합니다):', err);
+        // DB 실패 시 localStorage 데이터로 폴백
+        const fallback = loadSavedState();
+        setProfile(fallback);
+        console.warn('⚠️ [DB Sync] 서버 연동 실패, 로컬 데이터 사용:', err);
+      } finally {
+        setProfileReady(true);
       }
     };
     fetchExperienceFromDB();
-  }, [dbKey]);
+  }, [dbKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 4. Track category progress (Check if actually filled in)
   const isCategoryComplete = (cat: CategoryKey): boolean => {
@@ -914,7 +904,11 @@ export default function ExperienceEditPage() {
 
         <div className={styles.content}>
           <AICoverLetterNotice />
-          {renderActiveForm()}
+          {profileReady ? renderActiveForm() : (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+              경험 데이터를 불러오는 중...
+            </div>
+          )}
         </div>
 
         {/* 액션 하단 바 */}

@@ -236,6 +236,32 @@ export default function ResumeEditorPage() {
     });
   };
 
+  const handleRefine = async () => {
+    if (!currentDraft.trim() || evaluating) return;
+    if (!currentEval) {
+      alert('먼저 "저장 및 피드백" 버튼을 눌러 평가를 받은 후 재작성할 수 있습니다.');
+      return;
+    }
+    setEvaluating(true);
+    try {
+      const res = await api.post('/resume/refine', {
+        draft: currentDraft,
+        evaluation: currentEval.evaluation,
+        user_answers: '',
+        context: { jd_analysis: companyInsights },
+      });
+      const refined: string = res.data.refined_draft || '';
+      if (refined.trim()) {
+        setDrafts((prev) => ({ ...prev, [currentIdx]: refined }));
+        await saveDraftToDB(questions[currentIdx], refined);
+      }
+    } catch {
+      alert('재작성 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
   const handleEvaluate = async () => {
     if (!currentDraft.trim() || evaluating) return;
     setEvaluating(true);
@@ -420,7 +446,12 @@ export default function ResumeEditorPage() {
             />
 
             <div className={styles.actionBar}>
-              <button className={styles.regenerateBtn} disabled>
+              <button
+                className={styles.regenerateBtn}
+                onClick={handleRefine}
+                disabled={!currentDraft.trim() || evaluating || !currentEval}
+                title={!currentEval ? '먼저 피드백을 받은 후 재작성할 수 있습니다' : 'AI가 평가 피드백을 반영해 다시 작성합니다'}
+              >
                 <RefreshCw size={14} /> AI 초안 재생성
               </button>
               <button className={`${styles.copyBtn} ${copied ? styles.copyBtnDone : ''}`} onClick={handleCopy}>
