@@ -108,7 +108,6 @@ const STAR_QUESTIONS: Record<StarStep, { question: string; hint: string }> = {
 };
 
 const STEP_LABELS = ['경험 선택', '경험 사항 확인', 'STAR 경험 정리', '자소서 작성'];
-const COMPANIES = ['카카오', '네이버', '삼성전자', '현대자동차', '토스', '쿠팡', '라인', '카카오뱅크', '당근', '배달의민족'];
 
 export default function ResumePage() {
   const navigate = useNavigate();
@@ -468,10 +467,14 @@ export default function ResumePage() {
             <h2 className={styles.cardTitle}>지원 정보 입력</h2>
             <div className={styles.formGroup}>
               <label className={styles.label}>기업명</label>
-              <select className={styles.select} value={companyName} onChange={(e) => setCompanyName(e.target.value)}>
-                <option value="">기업을 선택하세요</option>
-                {COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <input
+                type="text"
+                className={styles.input}
+                placeholder="예) 카카오, 네이버, 토스"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && companyName.trim() && jobTitle.trim()) handleSetupNext(); }}
+              />
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>직무 / 공고</label>
@@ -481,10 +484,10 @@ export default function ResumePage() {
                 placeholder="예) 프론트엔드 개발자"
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && companyName && jobTitle.trim()) handleSetupNext(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && companyName.trim() && jobTitle.trim()) handleSetupNext(); }}
               />
             </div>
-            <button className={styles.primaryBtn} onClick={handleSetupNext} disabled={!companyName || !jobTitle.trim()}>
+            <button className={styles.primaryBtn} onClick={handleSetupNext} disabled={!companyName.trim() || !jobTitle.trim()}>
               다음
             </button>
           </div>
