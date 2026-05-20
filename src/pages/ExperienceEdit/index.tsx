@@ -195,7 +195,7 @@ export default function ExperienceEditPage() {
         const res = await api.get('/experience');
         if (res.data) {
           // 서버 데이터가 비어있지 않다면 상태와 로컬 스케줄러 동기화
-          setProfile(res.data);
+          setProfile(normalizeProfile(res.data));
           localStorage.setItem(dbKey, JSON.stringify(res.data));
           console.log('📬 [DB Sync] 데이터베이스에서 경험 스펙을 안전하게 동기화 완료했습니다.');
         }
