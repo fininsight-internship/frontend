@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Check } from 'lucide-react';
 import api from '../../services/api';
+<<<<<<< HEAD
 import { useAuthStore } from '../../store/authStore';
+=======
+>>>>>>> 8419594 (경험 작성 & 마이페이지 화면 구현 및 DB 실시간 연동)
 import styles from './MyPage.module.css';
 
 type Section = '개인정보' | '경험관리' | '구독관리' | '알림설정';
@@ -92,10 +95,18 @@ function ExperienceSection() {
   const { user } = useAuthStore();
   const dbKey = user ? `experience_profile_${user.id}` : 'experience_profile_guest';
 
-  const [profile, setProfile] = useState<any>(null);
+  // 로그인된 사용자 고유 스토리지 키 로드
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const dbKey = user ? `experience_profile_${user.id}` : 'experience_profile_guest';
+
+  // 경험 정보 상태 관리 (로컬 캐시 초기화 및 DB 동기화)
+  const [profile, setProfile] = useState<any>(() => {
+    const saved = localStorage.getItem(dbKey);
+    return saved ? JSON.parse(saved) : null;
+  });
 
   useEffect(() => {
-    setProfile(null); // 계정 전환 시 이전 데이터 즉시 초기화
     const fetchExperience = async () => {
       try {
         const res = await api.get('/experience');
@@ -104,9 +115,6 @@ function ExperienceSection() {
           localStorage.setItem(dbKey, JSON.stringify(res.data));
         }
       } catch (err) {
-        // DB 실패 시 localStorage 폴백
-        const saved = localStorage.getItem(dbKey);
-        if (saved) setProfile(JSON.parse(saved));
         console.warn('DB 경험 데이터 로드 실패:', err);
       }
     };
@@ -153,6 +161,12 @@ function ExperienceSection() {
     });
   }
 
+  // 저장 내역이 없는 경우 가이드용 기본 데이터 노출
+  const displayExps = exps.length > 0 ? exps : [
+    { id: '1', title: '네이버 주식회사 (프론트엔드 개발 인턴)', detail: 'React Query 최적화 및 공통 컴포넌트 라이브러리 기여', category: '경력인턴', categoryLabel: '경력 / 인턴' },
+    { id: '2', title: '실시간 취업 코칭 플랫폼 CareerAI 프로젝트', detail: '이력서 RAG 매칭 및 피드백 대시보드 설계', category: '프로젝트', categoryLabel: '프로젝트' }
+  ];
+
   const handleClick = (categoryKey: string) => {
     navigate('/experience/edit', {
       state: { category: categoryKey },
@@ -188,33 +202,25 @@ function ExperienceSection() {
       </div>
 
       <div className={styles.expList}>
-        {profile === null ? (
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem', padding: '1rem 0' }}>경험 데이터를 불러오는 중...</p>
-        ) : exps.length === 0 ? (
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem', padding: '1rem 0' }}>
-            등록된 경험이 없습니다. <strong>+ 새 경험 등록하기</strong>를 눌러 경험을 추가해 주세요.
-          </p>
-        ) : (
-          exps.map((exp) => (
-            <div key={exp.id} className={`${styles.expCard} ${styles.expCardClickable}`} onClick={() => handleClick(exp.category)}>
-              <div>
-                <p className={styles.expCompany} style={{ fontWeight: '700', color: 'var(--color-text)' }}>{exp.title}</p>
-                <p className={styles.expRole} style={{ fontSize: '0.82rem', color: 'var(--color-primary)', fontWeight: '600', marginTop: '2px' }}>
-                  📂 {exp.categoryLabel}
-                </p>
-                <p className={styles.expPeriod} style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                  {exp.detail || '상세 세부 경험 내용이 작성되지 않았습니다. 클릭하여 작성해 주세요.'}
-                </p>
-              </div>
-              <div className={styles.expRight}>
-                <span className={`${styles.starBadge} ${exp.detail ? styles.starDone : styles.starMissing}`}>
-                  {exp.detail ? '상세내용 입력됨' : '상세내용 미입력'}
-                </span>
-                <ChevronRight size={16} className={styles.expChevron} />
-              </div>
+        {displayExps.map((exp) => (
+          <div key={exp.id} className={`${styles.expCard} ${styles.expCardClickable}`} onClick={() => handleClick(exp.category)}>
+            <div>
+              <p className={styles.expCompany} style={{ fontWeight: '700', color: 'var(--color-text)' }}>{exp.title}</p>
+              <p className={styles.expRole} style={{ fontSize: '0.82rem', color: 'var(--color-primary)', fontWeight: '600', marginTop: '2px' }}>
+                📂 {exp.categoryLabel}
+              </p>
+              <p className={styles.expPeriod} style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                {exp.detail || '상세 세부 경험 내용이 작성되지 않았습니다. 클릭하여 작성해 주세요.'}
+              </p>
             </div>
-          ))
-        )}
+            <div className={styles.expRight}>
+              <span className={`${styles.starBadge} ${exp.detail ? styles.starDone : styles.starMissing}`}>
+                {exp.detail ? '상세내용 입력됨' : '상세내용 미입력'}
+              </span>
+              <ChevronRight size={16} className={styles.expChevron} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
