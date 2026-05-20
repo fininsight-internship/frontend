@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../constants';
+import api from '../../services/api';
 import styles from './Home.module.css';
 
 // ─── Mock data ────────────────────────────────────────────────────
@@ -60,12 +62,42 @@ function InterviewBadge({ status }: { status: InterviewStatus }) {
 }
 
 export default function HomePage() {
+  const [userName, setUserName] = useState<string>('');
+
+  useEffect(() => {
+    const fetchMe = async () => {
+      try {
+        const res = await api.get('/auth/me');
+        if (res.data && res.data.data && res.data.data.name) {
+          setUserName(res.data.data.name);
+          return;
+        }
+      } catch (err) {
+        console.warn('사용자 이름 로드 실패:', err);
+      }
+      
+      // API 실패나 이름이 없을 경우 localStorage 폴백
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user.name) setUserName(user.name);
+          else setUserName('유저');
+        } catch(e) {
+          setUserName('유저');
+        }
+      } else {
+        setUserName('유저');
+      }
+    };
+    fetchMe();
+  }, []);
 
   return (
     <div className={styles.page}>
       {/* Greeting */}
       <div className={styles.greeting}>
-        <h1 className={styles.greetingTitle}>안녕하세요, 이성재 님 👋</h1>
+        <h1 className={styles.greetingTitle}>안녕하세요, {userName || '유저'} 님 👋</h1>
         <p className={styles.greetingSubtitle}>오늘도 취업 준비 화이팅! 현재 {COMPANIES.length}개 기업 준비 중입니다.</p>
       </div>
 

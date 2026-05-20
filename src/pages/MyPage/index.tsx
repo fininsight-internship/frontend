@@ -37,21 +37,61 @@ const PLANS = [
   },
 ];
 
-function ProfileSection() {
+function ProfileSection({ onSaved }: { onSaved: () => void }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
-    name: '김민준', nickname: 'minj',
-    email: 'minj@email.com', phone: '010-1234-5678',
-    jobInterest: '프론트엔드 개발', targetCompany: '대기업, 스타트업',
+    name: '', eng_name: '',
+    email: '', birth_date: '', role: '',
   });
+
+  useEffect(() => {
+    const fetchMe = async () => {
+      try {
+        const res = await api.get('/auth/me');
+        if (res.data && res.data.data) {
+          const d = res.data.data;
+          setForm({
+            name: d.name || '',
+            eng_name: d.eng_name || '',
+            email: d.email || '',
+            birth_date: d.birth_date || '',
+            role: d.role || '',
+          });
+        }
+      } catch (err) {
+        console.warn('개인정보 로드 실패:', err);
+      }
+    };
+    fetchMe();
+  }, []);
+
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const handleSave = async () => {
+    if (editing) {
+      try {
+        await api.put('/auth/me', {
+          name: form.name,
+          eng_name: form.eng_name,
+          birth_date: form.birth_date,
+          role: form.role,
+        });
+        alert('개인정보가 성공적으로 저장되었습니다.');
+        onSaved(); // 알림 및 좌측 패널 새로고침 트리거
+      } catch (err) {
+        console.error('개인정보 저장 실패:', err);
+        alert('저장에 실패했습니다.');
+      }
+    }
+    setEditing((v) => !v);
+  };
 
   return (
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>개인정보 수정</h2>
-        <button className={styles.editBtn} onClick={() => setEditing((v) => !v)}>
+        <button className={styles.editBtn} onClick={handleSave}>
           {editing ? '저장' : '수정'}
         </button>
       </div>
@@ -61,36 +101,27 @@ function ProfileSection() {
           <input className={styles.input} value={form.name} onChange={update('name')} disabled={!editing} />
         </div>
         <div className={styles.formGroup}>
-          <label className={styles.label}>닉네임</label>
-          <input className={styles.input} value={form.nickname} onChange={update('nickname')} disabled={!editing} />
+          <label className={styles.label}>영문명</label>
+          <input className={styles.input} value={form.eng_name} onChange={update('eng_name')} disabled={!editing} />
         </div>
         <div className={styles.formGroup}>
           <label className={styles.label}>이메일</label>
-          <input className={styles.input} value={form.email} onChange={update('email')} disabled={!editing} />
+          <input className={styles.input} value={form.email} disabled={true} title="이메일은 변경할 수 없습니다." />
         </div>
         <div className={styles.formGroup}>
-          <label className={styles.label}>연락처</label>
-          <input className={styles.input} value={form.phone} onChange={update('phone')} disabled={!editing} />
+          <label className={styles.label}>생년월일 (YYYYMMDD)</label>
+          <input className={styles.input} value={form.birth_date} onChange={update('birth_date')} disabled={!editing} placeholder="예: 19950101" />
         </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>관심 직무</label>
-          <input className={styles.input} value={form.jobInterest} onChange={update('jobInterest')} disabled={!editing} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>목표 기업 유형</label>
-          <input className={styles.input} value={form.targetCompany} onChange={update('targetCompany')} disabled={!editing} />
+        <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+          <label className={styles.label}>희망 직무</label>
+          <input className={styles.input} value={form.role} onChange={update('role')} disabled={!editing} placeholder="예: 프론트엔드 개발자" />
         </div>
       </div>
     </div>
   );
 }
 
-const MOCK_EXPERIENCES = [
-  { id: '1', company: '네이버 주식회사', role: '프론트엔드 개발 인턴', period: '2024.07 - 2024.08', hasStar: true, category: '경력인턴' as const },
-  { id: '2', company: '개인 프로젝트', role: '투업 관리 플랫폼 개발', period: '2024.03 - 2024.06', hasStar: true, category: '프로젝트' as const },
-  { id: '3', company: 'ABC 스타트업', role: '풀스택 개발 인턴', period: '2023.12 - 2024.02', hasStar: false, category: '경력인턴' as const },
-  { id: '4', company: '우아한테크코스 5기', role: '프론트엔드 과정', period: '2023.02 - 2023.11', hasStar: false, category: '교육부트캠프' as const },
-];
+
 
 function ExperienceSection() {
   const navigate = useNavigate();
@@ -161,11 +192,7 @@ function ExperienceSection() {
     });
   }
 
-  // 저장 내역이 없는 경우 가이드용 기본 데이터 노출
-  const displayExps = exps.length > 0 ? exps : [
-    { id: '1', title: '네이버 주식회사 (프론트엔드 개발 인턴)', detail: 'React Query 최적화 및 공통 컴포넌트 라이브러리 기여', category: '경력인턴', categoryLabel: '경력 / 인턴' },
-    { id: '2', title: '실시간 취업 코칭 플랫폼 CareerAI 프로젝트', detail: '이력서 RAG 매칭 및 피드백 대시보드 설계', category: '프로젝트', categoryLabel: '프로젝트' }
-  ];
+  const displayExps = exps;
 
   const handleClick = (categoryKey: string) => {
     navigate('/experience/edit', {
@@ -202,25 +229,32 @@ function ExperienceSection() {
       </div>
 
       <div className={styles.expList}>
-        {displayExps.map((exp) => (
-          <div key={exp.id} className={`${styles.expCard} ${styles.expCardClickable}`} onClick={() => handleClick(exp.category)}>
-            <div>
-              <p className={styles.expCompany} style={{ fontWeight: '700', color: 'var(--color-text)' }}>{exp.title}</p>
-              <p className={styles.expRole} style={{ fontSize: '0.82rem', color: 'var(--color-primary)', fontWeight: '600', marginTop: '2px' }}>
-                📂 {exp.categoryLabel}
-              </p>
-              <p className={styles.expPeriod} style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                {exp.detail || '상세 세부 경험 내용이 작성되지 않았습니다. 클릭하여 작성해 주세요.'}
-              </p>
+        {displayExps.length > 0 ? (
+          displayExps.map((exp) => (
+            <div key={exp.id} className={`${styles.expCard} ${styles.expCardClickable}`} onClick={() => handleClick(exp.category)}>
+              <div>
+                <p className={styles.expCompany} style={{ fontWeight: '700', color: 'var(--color-text)' }}>{exp.title}</p>
+                <p className={styles.expRole} style={{ fontSize: '0.82rem', color: 'var(--color-primary)', fontWeight: '600', marginTop: '2px' }}>
+                  📂 {exp.categoryLabel}
+                </p>
+                <p className={styles.expPeriod} style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                  {exp.detail || '상세 세부 경험 내용이 작성되지 않았습니다. 클릭하여 작성해 주세요.'}
+                </p>
+              </div>
+              <div className={styles.expRight}>
+                <span className={`${styles.starBadge} ${exp.detail ? styles.starDone : styles.starMissing}`}>
+                  {exp.detail ? '상세내용 입력됨' : '상세내용 미입력'}
+                </span>
+                <ChevronRight size={16} className={styles.expChevron} />
+              </div>
             </div>
-            <div className={styles.expRight}>
-              <span className={`${styles.starBadge} ${exp.detail ? styles.starDone : styles.starMissing}`}>
-                {exp.detail ? '상세내용 입력됨' : '상세내용 미입력'}
-              </span>
-              <ChevronRight size={16} className={styles.expChevron} />
-            </div>
+          ))
+        ) : (
+          <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'var(--color-surface)', borderRadius: '12px', border: '1px dashed var(--color-border)', color: 'var(--color-text-secondary)' }}>
+            <p style={{ fontWeight: '600', marginBottom: '0.5rem', color: 'var(--color-text)' }}>등록된 경험 내역이 없습니다.</p>
+            <p style={{ fontSize: '0.85rem' }}>새 경험 등록하기 버튼을 눌러 소중한 경험을 추가해 주세요.</p>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
@@ -304,9 +338,28 @@ function NotificationSection() {
 
 export default function MyPage() {
   const [active, setActive] = useState<Section>('개인정보');
+  const [userInfo, setUserInfo] = useState({ name: '', email: '' });
+  const [refresh, setRefresh] = useState(0); // 프로필 저장 후 리렌더링 트리거
+
+  useEffect(() => {
+    const fetchMe = async () => {
+      try {
+        const res = await api.get('/auth/me');
+        if (res.data && res.data.data) {
+          setUserInfo({
+            name: res.data.data.name || '유저',
+            email: res.data.data.email || ''
+          });
+        }
+      } catch (err) {
+        console.warn(err);
+      }
+    };
+    fetchMe();
+  }, [refresh]);
 
   const contentMap: Record<Section, React.ReactNode> = {
-    개인정보: <ProfileSection />,
+    개인정보: <ProfileSection onSaved={() => setRefresh(prev => prev + 1)} />,
     경험관리: <ExperienceSection />,
     구독관리: <SubscriptionSection />,
     알림설정: <NotificationSection />,
@@ -321,9 +374,9 @@ export default function MyPage() {
         <aside className={styles.leftPanel}>
           {/* Profile card */}
           <div className={styles.profileCard}>
-            <div className={styles.avatar}>김</div>
-            <p className={styles.profileName}>김민준</p>
-            <p className={styles.profileEmail}>minj@email.com</p>
+            <div className={styles.avatar}>{userInfo.name ? userInfo.name.charAt(0) : 'U'}</div>
+            <p className={styles.profileName}>{userInfo.name}</p>
+            <p className={styles.profileEmail}>{userInfo.email}</p>
             <div className={styles.planBadge}>
               <span className={styles.planBadgeName}>Free 플랜</span>
               <span className={styles.planBadgeUsage}>이번 달 3/5회 사용</span>
