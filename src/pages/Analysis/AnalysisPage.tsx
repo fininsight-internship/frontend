@@ -35,52 +35,6 @@ interface SavedReport {
   rawData: any;
 }
 
-const MOCK_REPORTS: SavedReport[] = [
-  {
-    id: '1',
-    company: '카카오',
-    companyInitial: '카',
-    companyColor: '#FACC15',
-    position: '프론트엔드 개발자',
-    tags: ['React', 'TypeScript', '성장성'],
-    score: 84,
-    date: '2025.05.12',
-    starred: true,
-  },
-  {
-    id: '2',
-    company: '네이버',
-    companyInitial: '네',
-    companyColor: '#22C55E',
-    position: '데이터 분석가',
-    tags: ['Python', 'SQL', 'ML'],
-    score: 71,
-    date: '2025.05.08',
-    starred: true,
-  },
-  {
-    id: '3',
-    company: '토스',
-    companyInitial: '토',
-    companyColor: '#3B82F6',
-    position: 'iOS 개발자',
-    tags: ['Swift', '핀테크', '성장형인재'],
-    score: 67,
-    date: '2025.05.01',
-    starred: false,
-  },
-  {
-    id: '4',
-    company: '쿠팡',
-    companyInitial: '쿠',
-    companyColor: '#F59E0B',
-    position: '백엔드 개발자',
-    tags: ['Java', 'Spring', '물류'],
-    score: 58,
-    date: '2025.04.28',
-    starred: false,
-  },
-];
 
 type TabType = 'all' | 'starred' | 'recent';
 

@@ -2,10 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Check } from 'lucide-react';
 import api from '../../services/api';
-<<<<<<< HEAD
-import { useAuthStore } from '../../store/authStore';
-=======
->>>>>>> 8419594 (경험 작성 & 마이페이지 화면 구현 및 DB 실시간 연동)
 import styles from './MyPage.module.css';
 
 type Section = '개인정보' | '경험관리' | '구독관리' | '알림설정';
@@ -93,11 +89,6 @@ function ProfileSection() {
 function ExperienceSection() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const dbKey = user ? `experience_profile_${user.id}` : 'experience_profile_guest';
-
-  // 로그인된 사용자 고유 스토리지 키 로드
-  const userStr = localStorage.getItem('user');
-  const user = userStr ? JSON.parse(userStr) : null;
   const dbKey = user ? `experience_profile_${user.id}` : 'experience_profile_guest';
 
   // 경험 정보 상태 관리 (로컬 캐시 초기화 및 DB 동기화)

@@ -18,7 +18,7 @@ interface Experience {
   role: string;
   tags: string[];
   hasDetail: boolean;
-  starData?: Record<StarStep, string>;
+  detail?: string;
 }
 
 interface StarMessage {
@@ -112,7 +112,7 @@ export default function ResumePage() {
       const data = res.data;
       const mapped: Experience[] = [];
 
-      (data['경력인턴'] || []).forEach((c: { id: string; company: string; department: string; startDate: string; endDate: string; detail: string; starData?: Record<StarStep, string> }) => {
+      (data['경력인턴'] || []).forEach((c: { id: string; company: string; department: string; startDate: string; endDate: string; detail: string }) => {
         if (!c.company?.trim() && !c.department?.trim()) return;
         mapped.push({
           id: c.id,
@@ -121,12 +121,12 @@ export default function ResumePage() {
           period: [c.startDate, c.endDate].filter(Boolean).join(' - '),
           role: c.department || '',
           tags: [],
-          hasDetail: !!c.starData,
-          starData: c.starData,
+          hasDetail: !!c.detail,
+          detail: c.detail || '',
         });
       });
 
-      (data['교육부트캠프'] || []).forEach((b: { id: string; name: string; topic: string; detail: string; starData?: Record<StarStep, string> }) => {
+      (data['교육부트캠프'] || []).forEach((b: { id: string; name: string; topic: string; detail: string }) => {
         if (!b.name?.trim()) return;
         mapped.push({
           id: b.id,
@@ -135,12 +135,12 @@ export default function ResumePage() {
           period: '',
           role: b.topic || '',
           tags: [],
-          hasDetail: !!b.starData,
-          starData: b.starData,
+          hasDetail: !!b.detail,
+          detail: b.detail || '',
         });
       });
 
-      (data['프로젝트'] || []).forEach((p: { id: string; title: string; detail: string; starData?: Record<StarStep, string> }) => {
+      (data['프로젝트'] || []).forEach((p: { id: string; title: string; detail: string }) => {
         if (!p.title?.trim()) return;
         mapped.push({
           id: p.id,
@@ -149,8 +149,8 @@ export default function ResumePage() {
           period: '',
           role: p.title || '',
           tags: [],
-          hasDetail: !!p.starData,
-          starData: p.starData,
+          hasDetail: !!p.detail,
+          detail: p.detail || '',
         });
       });
 
@@ -178,7 +178,7 @@ export default function ResumePage() {
         company: e.company,
         role: e.role,
         tags: e.tags,
-        starData: e.starData ?? null,
+        detail: e.detail ?? '',
       })),
     }).then((res) => {
       const scores = res.data.scores || {};
@@ -206,8 +206,8 @@ export default function ResumePage() {
   const currentCharLimit = parseInt(coverQuestions[currentQuestionIdx]?.charLimit || '0', 10) || 0;
 
   const getStarData = (): Record<string, string> => {
-    if (selectedExp?.hasDetail && selectedExp.starData) return selectedExp.starData as Record<string, string>;
     if (starSummary) return starSummary;
+    if (selectedExp?.detail) return { S: selectedExp.detail, T: '', A: '', R: '' };
     const result: Record<string, string> = {};
     starMessages.forEach((m) => { if (m.answer) result[m.label[0]] = m.answer; });
     return result;
@@ -218,32 +218,44 @@ export default function ResumePage() {
     if (!companyName.trim() || !jobTitle.trim()) return;
     setSetupPhase('analyzing');
     try {
-      const [reportRes, jdRes] = await Promise.allSettled([
-        api.get(`/company/report?company=${encodeURIComponent(companyName)}&job=${encodeURIComponent(jobTitle)}`),
-        user?.id
-          ? api.get('/resume/jd-info', { params: { user_id: user.id, company_name: companyName, job_role: jobTitle } })
-          : Promise.reject('no user'),
-      ]);
+      // 1. DB에서 기존 기업/JD 분석 데이터 확인
+      let analysisData: any = null;
+      try {
+        const reportsRes = await api.get('/api/analysis/reports');
+        const reports: any[] = reportsRes.data?.data || [];
+        analysisData = reports.find(
+          (r: any) => r.company_name?.toLowerCase() === companyName.trim().toLowerCase()
+        ) || null;
+      } catch (_) {}
 
-      const parts: string[] = [];
-
-      if (reportRes.status === 'fulfilled' && reportRes.value.data?.data) {
-        const d = reportRes.value.data.data;
-        parts.push(...([d.summary, ...(d.issues || []), d.culture?.description || ''].filter(Boolean)));
+      if (!analysisData) {
+        // 2. 없으면 기업/JD 분석 실행 + DB 저장
+        try {
+          const formData = new FormData();
+          formData.append('company_name', companyName);
+          const analysisRes = await api.post('/api/analysis/report', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+          if (analysisRes.data?.success) {
+            analysisData = analysisRes.data.data;
+          }
+        } catch (_) {}
       }
 
-      if (jdRes.status === 'fulfilled' && jdRes.value.data?.status === 'success') {
-        const { jd_content, analysis_report } = jdRes.value.data;
-        if (jd_content) parts.push(`[JD 원문]\n${jd_content}`);
-        if (analysis_report) {
-          const report = typeof analysis_report === 'string' ? analysis_report : JSON.stringify(analysis_report);
-          parts.push(`[JD 분석]\n${report}`);
+      // 3. company insights 구성
+      if (analysisData) {
+        const parts: string[] = [];
+        const companyAnalysis = analysisData.company_analysis || {};
+        if (companyAnalysis.summary) parts.push(companyAnalysis.summary);
+        if (companyAnalysis.culture?.description) parts.push(companyAnalysis.culture.description);
+        const jobAnalysis = analysisData.job_analysis || {};
+        if (Object.keys(jobAnalysis).length > 0) {
+          parts.push(`[JD 분석]\n${JSON.stringify(jobAnalysis)}`);
         }
+        if (parts.length > 0) setCompanyInsights(parts.join('\n\n'));
       }
-
-      if (parts.length > 0) setCompanyInsights(parts.join('\n'));
     } catch (_) {
-      // proceed even without insights
+      // 분석 실패해도 다음 단계 진행
     }
     setSetupPhase('questions');
   };
@@ -340,10 +352,14 @@ export default function ResumePage() {
   const handleStep3SaveAndContinue = async () => {
     if (selectedExp && starSummary) {
       try {
-        await api.patch(`/experience/${selectedExp.id}/star-data`, { star_data: starSummary });
+        const detailText = Object.entries(starSummary)
+          .filter(([, v]) => v?.trim())
+          .map(([k, v]) => `[${k}] ${v}`)
+          .join('\n\n');
+        await api.patch(`/experience/${selectedExp.id}/detail`, { detail: detailText });
         setExperiences((prev) =>
           prev.map((e) =>
-            e.id === selectedExp.id ? { ...e, hasDetail: true, starData: starSummary as Record<StarStep, string> } : e
+            e.id === selectedExp.id ? { ...e, hasDetail: true, detail: detailText } : e
           )
         );
       } catch (_) {
@@ -452,68 +468,12 @@ export default function ResumePage() {
             setWizardStep('step1');
           }, 1200);
         } else {
-          // 모든 문항 완료 → 저장 + 평가 후 에디터로 이동
-          setCoverMessages((prev) => [...prev, { role: 'assistant', content: '✅ 모든 문항 작성 완료! 저장 중...' }]);
+          // 모든 문항 완료 → 평가 페이지로 이동 (저장/평가는 에디터 페이지에서 처리)
+          setCoverMessages((prev) => [...prev, { role: 'assistant', content: '✅ 모든 문항 작성 완료! 평가 페이지로 이동합니다...' }]);
           setWizardStep('done');
 
           const qTexts = coverQuestions.map((q) => q.text);
-          const userId = user?.id ? Number(user.id) : null;
-
-          const saveAndNavigate = async () => {
-            if (userId) {
-              try {
-                // 1단계: 모든 초안 순차 저장 → resumes + resume_questions
-                for (let idx = 0; idx < qTexts.length; idx++) {
-                  const d = updatedDrafts[idx] || '';
-                  if (!d.trim()) continue;
-                  await api.post('/resume/drafts/save', {
-                    user_id: userId,
-                    company_name: companyName,
-                    job_title: jobTitle,
-                    question_text: qTexts[idx],
-                    draft_content: d,
-                  });
-                }
-
-                // 2단계: 병렬 평가
-                const evalResults = await Promise.all(
-                  qTexts.map(async (q, idx) => {
-                    const d = updatedDrafts[idx] || '';
-                    if (!d.trim()) return null;
-                    try {
-                      const res = await api.post('/resume/evaluate-detailed', {
-                        draft: d,
-                        company_name: companyName,
-                        job_title: jobTitle,
-                        cover_question: q,
-                        selections: newSelections,
-                        company_insights: companyInsights,
-                      });
-                      return { idx, total_score: res.data.total_score, evaluation: res.data.evaluation };
-                    } catch {
-                      return null;
-                    }
-                  })
-                );
-
-                // 3단계: 평가 결과 순차 저장 → resume_question_evaluations
-                for (const item of evalResults) {
-                  if (!item) continue;
-                  await api.post('/resume/drafts/save', {
-                    user_id: userId,
-                    company_name: companyName,
-                    job_title: jobTitle,
-                    question_text: qTexts[item.idx],
-                    draft_content: updatedDrafts[item.idx] || '',
-                    ai_score: item.total_score,
-                    ai_feedback: item.evaluation,
-                  });
-                }
-              } catch (e) {
-                console.error('[resume save] 저장 실패:', e);
-              }
-            }
-
+          setTimeout(() => {
             navigate('/resume/editor', {
               state: {
                 companyName,
@@ -524,9 +484,7 @@ export default function ResumePage() {
                 selections: newSelections,
               },
             });
-          };
-
-          await saveAndNavigate();
+          }, 800);
         }
       } else {
         setCoverMessages((prev) => [...prev, {

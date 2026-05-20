@@ -82,6 +82,10 @@ export default function ResumeEditorPage() {
   // user를 ref로도 유지해 stale closure 방지
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
+  // React StrictMode 이중 실행 방지
+  const initedRef = useRef(false);
+  // 현재 세션의 resume_id (새 세션: create 후 저장, 기존 세션: DB 로드 후 저장)
+  const resumeIdRef = useRef<number | null>(null);
 
   const {
     companyName = '',
@@ -115,16 +119,19 @@ export default function ResumeEditorPage() {
     questionText: string, draftContent: string,
     aiScore?: number, aiFeedback?: string,
   ) => {
-    if (!user?.id) throw new Error('로그인 정보 없음');
-    await api.post('/resume/drafts/save', {
-      user_id: Number(user.id),
+    const currentUser = userRef.current;
+    if (!currentUser?.id) throw new Error('로그인 정보 없음');
+    const res = await api.post('/resume/drafts/save', {
+      user_id: Number(currentUser.id),
       company_name: companyName,
       job_title: jobTitle,
       question_text: questionText,
       draft_content: draftContent,
       ai_score: aiScore ?? null,
       ai_feedback: aiFeedback ?? null,
+      resume_id: resumeIdRef.current,
     });
+    return res.data as { status: string; draft: { id: number; draft_content: string; ai_score: number | null; ai_feedback: string; updated_at: string } };
   };
 
   const triggerAutoEvaluate = async (idx: number, draftText: string, qText: string) => {
@@ -154,76 +161,104 @@ export default function ResumeEditorPage() {
     }
   };
 
-  // DB에서 기존 초안 불러오기 및 평가가 없는 문항 자동 병렬 평가 실행
+  // 진입 시 초안 저장 → 병렬 평가 순서로 처리
   useEffect(() => {
+    if (initedRef.current) return;
+    initedRef.current = true;
+
     const currentUser = userRef.current;
-    if (!currentUser?.id || !companyName || !jobTitle) return;
+    console.log('[ResumeEditor] init — user:', currentUser?.id, 'company:', companyName, 'job:', jobTitle);
+    console.log('[ResumeEditor] state.drafts:', state.drafts);
+    if (!currentUser?.id || !companyName || !jobTitle) {
+      console.warn('[ResumeEditor] 초기화 중단: user/company/job 누락');
+      return;
+    }
 
-    api.get('/resume/drafts', {
-      params: { user_id: currentUser.id, company_name: companyName, job_title: jobTitle },
-    }).then((res) => {
-      const dbDrafts: Array<{
-        id: number; question_text: string; draft_content: string;
-        ai_score: number | null; ai_feedback: string;
-      }> = res.data.drafts;
+    const hasStateDrafts = Object.values(state.drafts || {}).some(
+      (d) => typeof d === 'string' && d.trim(),
+    );
+    console.log('[ResumeEditor] hasStateDrafts:', hasStateDrafts);
 
-      const newQuestions: string[] = [];
-      const newDrafts: Record<number, string> = {};
-      const newEvals: Record<number, EvaluationResult> = {};
-
-      if (dbDrafts && dbDrafts.length > 0) {
-        dbDrafts.forEach((d, i) => {
-          newQuestions.push(d.question_text);
-          newDrafts[i] = d.draft_content;
-          if (d.ai_score !== null && d.ai_feedback) {
-            newEvals[i] = { evaluation: d.ai_feedback, total_score: d.ai_score };
-          }
-        });
-      }
-
-      const hasStateDrafts = Object.values(state.drafts || {}).some(
-        (d) => typeof d === 'string' && d.trim(),
-      );
-
-      let activeQuestions = newQuestions;
-      let activeDrafts = newDrafts;
-
+    const initEditor = async () => {
       if (hasStateDrafts) {
-        activeQuestions = coverQuestions.length > 0 ? coverQuestions : [''];
-        activeDrafts = state.drafts || {};
-      } else {
-        if (dbDrafts && dbDrafts.length > 0) {
-          setQuestions(newQuestions);
-          setDrafts(newDrafts);
-        }
-      }
-      
-      setEvaluations(newEvals);
-
-      // 평가가 없는 문항에 대해서 자동으로 병렬 평가를 트리거
-      activeQuestions.forEach((qText, idx) => {
-        const draftText = activeDrafts[idx] || '';
-        const hasEval = newEvals[idx] != null;
-        if (draftText.trim() && !hasEval) {
-          triggerAutoEvaluate(idx, draftText, qText);
-        }
-      });
-    }).catch(() => {
-      // DB 조회 에러 시, 마법사에서 넘어온 state 기반으로라도 평가가 없다면 트리거 시도
-      const hasStateDrafts = Object.values(state.drafts || {}).some(
-        (d) => typeof d === 'string' && d.trim(),
-      );
-      if (hasStateDrafts) {
+        // 새 세션 (wizard에서 전달된 초안): 새 resume 생성 → 순차 저장 → 병렬 평가
         const activeQuestions = coverQuestions.length > 0 ? coverQuestions : [''];
         const activeDrafts = state.drafts || {};
-        activeQuestions.forEach((qText, idx) => {
+
+        // 0단계: 새 resume 행 생성
+        try {
+          const createRes = await api.post('/resume/create', {
+            user_id: Number(currentUser.id),
+            company_name: companyName,
+            job_title: jobTitle,
+          });
+          resumeIdRef.current = createRes.data.resume_id;
+          console.log(`[initEditor] 새 resume 생성: id=${resumeIdRef.current}`);
+        } catch (e) {
+          console.error('[initEditor] resume 생성 실패:', e);
+          return;
+        }
+
+        // 1단계: 모든 초안 순차 저장 (race condition 방지)
+        for (let idx = 0; idx < activeQuestions.length; idx++) {
           const draftText = activeDrafts[idx] || '';
           if (draftText.trim()) {
-            triggerAutoEvaluate(idx, draftText, qText);
+            try {
+              await saveDraftToDB(activeQuestions[idx], draftText);
+              console.log(`[initEditor] Q${idx + 1} 저장 완료`);
+            } catch (e) {
+              console.error(`[initEditor] Q${idx + 1} 저장 실패:`, e);
+            }
           }
+        }
+
+        // 2단계: 항목별 병렬 평가 (각 완료 시 triggerAutoEvaluate 내부에서 DB 저장)
+        activeQuestions.forEach((qText, idx) => {
+          const draftText = activeDrafts[idx] || '';
+          if (draftText.trim()) triggerAutoEvaluate(idx, draftText, qText);
         });
+      } else {
+        // 기존 세션: DB에서 최신 초안 로드 → resume_id 저장 → 평가 없는 항목 병렬 평가
+        try {
+          const res = await api.get('/resume/drafts', {
+            params: { user_id: currentUser.id, company_name: companyName, job_title: jobTitle },
+          });
+          resumeIdRef.current = res.data.resume_id ?? null;
+
+          const dbDrafts: Array<{
+            id: number; question_text: string; draft_content: string;
+            ai_score: number | null; ai_feedback: string;
+          }> = res.data.drafts || [];
+
+          const newQuestions: string[] = [];
+          const newDrafts: Record<number, string> = {};
+          const newEvals: Record<number, EvaluationResult> = {};
+
+          dbDrafts.forEach((d, i) => {
+            newQuestions.push(d.question_text);
+            newDrafts[i] = d.draft_content;
+            if (d.ai_score !== null && d.ai_feedback) {
+              newEvals[i] = { evaluation: d.ai_feedback, total_score: d.ai_score };
+            }
+          });
+
+          if (dbDrafts.length > 0) {
+            setQuestions(newQuestions);
+            setDrafts(newDrafts);
+          }
+          setEvaluations(newEvals);
+
+          newQuestions.forEach((qText, idx) => {
+            const draftText = newDrafts[idx] || '';
+            if (draftText.trim() && !newEvals[idx]) {
+              triggerAutoEvaluate(idx, draftText, qText);
+            }
+          });
+        } catch (_) {}
       }
-    });
+    };
+
+    initEditor();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 
@@ -341,6 +376,7 @@ export default function ResumeEditorPage() {
           company_name: companyName,
           job_title: jobTitle,
           overall_feedback: res.data.feedback,
+          resume_id: resumeIdRef.current,
         }).catch(() => {});
       }
     } catch {
