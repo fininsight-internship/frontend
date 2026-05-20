@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Check } from 'lucide-react';
+import api from '../../services/api';
 import styles from './MyPage.module.css';
 
 type Section = '개인정보' | '경험관리' | '구독관리' | '알림설정';
@@ -94,28 +95,127 @@ const MOCK_EXPERIENCES = [
 function ExperienceSection() {
   const navigate = useNavigate();
 
-  const handleClick = (exp: typeof MOCK_EXPERIENCES[0]) => {
+  // 로그인된 사용자 고유 스토리지 키 로드
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const dbKey = user ? `experience_profile_${user.id}` : 'experience_profile_guest';
+
+  // 경험 정보 상태 관리 (로컬 캐시 초기화 및 DB 동기화)
+  const [profile, setProfile] = useState<any>(() => {
+    const saved = localStorage.getItem(dbKey);
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  useEffect(() => {
+    const fetchExperience = async () => {
+      try {
+        const res = await api.get('/experience');
+        if (res.data) {
+          setProfile(res.data);
+          localStorage.setItem(dbKey, JSON.stringify(res.data));
+        }
+      } catch (err) {
+        console.warn('DB 경험 데이터 로드 실패:', err);
+      }
+    };
+    fetchExperience();
+  }, [dbKey]);
+
+  const categoriesToRender = [
+    { key: '경력인턴', label: '경력 / 인턴' },
+    { key: '교육부트캠프', label: '교육 / 부트캠프' },
+    { key: '프로젝트', label: '프로젝트' },
+    { key: '동아리', label: '동아리' },
+    { key: '봉사활동', label: '봉사활동' },
+    { key: '기타경험', label: '기타 경험 사항' },
+  ];
+
+  const exps: any[] = [];
+  if (profile) {
+    categoriesToRender.forEach((cat) => {
+      const array = profile[cat.key as any] || [];
+      array.forEach((item: any) => {
+        let displayTitle = '';
+        if (cat.key === '경력인턴') {
+          if (item.company) {
+            displayTitle = `${item.company} (${item.department || ''} / ${item.startDate || ''} ~ ${item.endDate || ''})`;
+          }
+        } else if (cat.key === '교육부트캠프') {
+          if (item.name) {
+            displayTitle = `${item.name} (${item.topic || ''})`;
+          }
+        } else {
+          displayTitle = item.title;
+        }
+
+        if (displayTitle) {
+          exps.push({
+            id: item.id,
+            title: displayTitle,
+            detail: item.detail,
+            category: cat.key,
+            categoryLabel: cat.label
+          });
+        }
+      });
+    });
+  }
+
+  // 저장 내역이 없는 경우 가이드용 기본 데이터 노출
+  const displayExps = exps.length > 0 ? exps : [
+    { id: '1', title: '네이버 주식회사 (프론트엔드 개발 인턴)', detail: 'React Query 최적화 및 공통 컴포넌트 라이브러리 기여', category: '경력인턴', categoryLabel: '경력 / 인턴' },
+    { id: '2', title: '실시간 취업 코칭 플랫폼 CareerAI 프로젝트', detail: '이력서 RAG 매칭 및 피드백 대시보드 설계', category: '프로젝트', categoryLabel: '프로젝트' }
+  ];
+
+  const handleClick = (categoryKey: string) => {
     navigate('/experience/edit', {
-      state: { category: exp.category },
+      state: { category: categoryKey },
     });
   };
 
   return (
     <div className={styles.section}>
-      <div className={styles.sectionHeader}>
+      <div className={styles.sectionHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className={styles.sectionTitle}>내 경험 관리</h2>
+        <button 
+          onClick={() => navigate('/experience/edit')} 
+          className={styles.editBtn} 
+          style={{ background: 'var(--color-primary)', color: '#fff', border: 'none', padding: '0.45rem 1rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}
+        >
+          + 새 경험 등록하기
+        </button>
       </div>
+      
+      {/* AI 지원 공지 배너 추가 */}
+      <div style={{ 
+        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%)', 
+        border: '1px solid var(--color-border)', 
+        borderRadius: '10px', 
+        padding: '1rem', 
+        fontSize: '0.82rem', 
+        color: 'var(--color-text-secondary)',
+        lineHeight: '1.5',
+        marginBottom: '1rem' 
+      }}>
+        💡 <strong>자소서 연동 꿀팁:</strong> 상세히 입력해 주신 모든 경험은 AI가 고품질 자기소개서 초안을 빌드할 때 우선 순위로 결합됩니다. 
+        만약 간단하게만 작성하셨더라도 걱정 마세요! 자소서 탭에서 <strong>AI 멘토가 대화식(멀티턴) 질문을 통해 스토리 구체화를 직접 무료로 도와드립니다.</strong>
+      </div>
+
       <div className={styles.expList}>
-        {MOCK_EXPERIENCES.map((exp) => (
-          <div key={exp.id} className={`${styles.expCard} ${styles.expCardClickable}`} onClick={() => handleClick(exp)}>
+        {displayExps.map((exp) => (
+          <div key={exp.id} className={`${styles.expCard} ${styles.expCardClickable}`} onClick={() => handleClick(exp.category)}>
             <div>
-              <p className={styles.expCompany}>{exp.company}</p>
-              <p className={styles.expRole}>{exp.role}</p>
-              <p className={styles.expPeriod}>{exp.period}</p>
+              <p className={styles.expCompany} style={{ fontWeight: '700', color: 'var(--color-text)' }}>{exp.title}</p>
+              <p className={styles.expRole} style={{ fontSize: '0.82rem', color: 'var(--color-primary)', fontWeight: '600', marginTop: '2px' }}>
+                📂 {exp.categoryLabel}
+              </p>
+              <p className={styles.expPeriod} style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                {exp.detail || '상세 세부 경험 내용이 작성되지 않았습니다. 클릭하여 작성해 주세요.'}
+              </p>
             </div>
             <div className={styles.expRight}>
-              <span className={`${styles.starBadge} ${exp.hasStar ? styles.starDone : styles.starMissing}`}>
-                {exp.hasStar ? 'STAR 입력됨' : 'STAR 미입력'}
+              <span className={`${styles.starBadge} ${exp.detail ? styles.starDone : styles.starMissing}`}>
+                {exp.detail ? '상세내용 입력됨' : '상세내용 미입력'}
               </span>
               <ChevronRight size={16} className={styles.expChevron} />
             </div>
