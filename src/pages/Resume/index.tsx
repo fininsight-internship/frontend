@@ -112,7 +112,7 @@ export default function ResumePage() {
       const data = res.data;
       const mapped: Experience[] = [];
 
-      (data['경력인턴'] || []).forEach((c: { id: string; company: string; department: string; startDate: string; endDate: string; detail: string }) => {
+      (data['경력인턴'] || []).forEach((c: { id: string; company: string; department: string; startDate: string; endDate: string; detail: string; starData?: Record<StarStep, string> }) => {
         if (!c.company?.trim() && !c.department?.trim()) return;
         mapped.push({
           id: c.id,
@@ -121,11 +121,12 @@ export default function ResumePage() {
           period: [c.startDate, c.endDate].filter(Boolean).join(' - '),
           role: c.department || '',
           tags: [],
-          hasDetail: false,
+          hasDetail: !!c.starData,
+          starData: c.starData,
         });
       });
 
-      (data['교육부트캠프'] || []).forEach((b: { id: string; name: string; topic: string; detail: string }) => {
+      (data['교육부트캠프'] || []).forEach((b: { id: string; name: string; topic: string; detail: string; starData?: Record<StarStep, string> }) => {
         if (!b.name?.trim()) return;
         mapped.push({
           id: b.id,
@@ -134,11 +135,12 @@ export default function ResumePage() {
           period: '',
           role: b.topic || '',
           tags: [],
-          hasDetail: false,
+          hasDetail: !!b.starData,
+          starData: b.starData,
         });
       });
 
-      (data['프로젝트'] || []).forEach((p: { id: string; title: string; detail: string }) => {
+      (data['프로젝트'] || []).forEach((p: { id: string; title: string; detail: string; starData?: Record<StarStep, string> }) => {
         if (!p.title?.trim()) return;
         mapped.push({
           id: p.id,
@@ -147,7 +149,8 @@ export default function ResumePage() {
           period: '',
           role: p.title || '',
           tags: [],
-          hasDetail: false,
+          hasDetail: !!p.starData,
+          starData: p.starData,
         });
       });
 
@@ -334,6 +337,22 @@ export default function ResumePage() {
     setWizardStep('step4');
   };
 
+  const handleStep3SaveAndContinue = async () => {
+    if (selectedExp && starSummary) {
+      try {
+        await api.patch(`/experience/${selectedExp.id}/star-data`, { star_data: starSummary });
+        setExperiences((prev) =>
+          prev.map((e) =>
+            e.id === selectedExp.id ? { ...e, hasDetail: true, starData: starSummary as Record<StarStep, string> } : e
+          )
+        );
+      } catch (_) {
+        // 저장 실패해도 자소서 작성은 계속 진행
+      }
+    }
+    handleStep3Continue();
+  };
+
   // ─── Step 4: Cover letter chat ────────────────────────────────
   const startCoverChat = async (questionText?: string, charLimit?: number) => {
     const q = questionText ?? currentCoverQ;
@@ -433,21 +452,81 @@ export default function ResumePage() {
             setWizardStep('step1');
           }, 1200);
         } else {
-          // 모든 문항 완료 → 에디터로 이동
-          setCoverMessages((prev) => [...prev, { role: 'assistant', content: '✅ 모든 문항 작성 완료! 에디터에서 수정할 수 있어요.' }]);
+          // 모든 문항 완료 → 저장 + 평가 후 에디터로 이동
+          setCoverMessages((prev) => [...prev, { role: 'assistant', content: '✅ 모든 문항 작성 완료! 저장 중...' }]);
           setWizardStep('done');
-          setTimeout(() => {
+
+          const qTexts = coverQuestions.map((q) => q.text);
+          const userId = user?.id ? Number(user.id) : null;
+
+          const saveAndNavigate = async () => {
+            if (userId) {
+              try {
+                // 1단계: 모든 초안 순차 저장 → resumes + resume_questions
+                for (let idx = 0; idx < qTexts.length; idx++) {
+                  const d = updatedDrafts[idx] || '';
+                  if (!d.trim()) continue;
+                  await api.post('/resume/drafts/save', {
+                    user_id: userId,
+                    company_name: companyName,
+                    job_title: jobTitle,
+                    question_text: qTexts[idx],
+                    draft_content: d,
+                  });
+                }
+
+                // 2단계: 병렬 평가
+                const evalResults = await Promise.all(
+                  qTexts.map(async (q, idx) => {
+                    const d = updatedDrafts[idx] || '';
+                    if (!d.trim()) return null;
+                    try {
+                      const res = await api.post('/resume/evaluate-detailed', {
+                        draft: d,
+                        company_name: companyName,
+                        job_title: jobTitle,
+                        cover_question: q,
+                        selections: newSelections,
+                        company_insights: companyInsights,
+                      });
+                      return { idx, total_score: res.data.total_score, evaluation: res.data.evaluation };
+                    } catch {
+                      return null;
+                    }
+                  })
+                );
+
+                // 3단계: 평가 결과 순차 저장 → resume_question_evaluations
+                for (const item of evalResults) {
+                  if (!item) continue;
+                  await api.post('/resume/drafts/save', {
+                    user_id: userId,
+                    company_name: companyName,
+                    job_title: jobTitle,
+                    question_text: qTexts[item.idx],
+                    draft_content: updatedDrafts[item.idx] || '',
+                    ai_score: item.total_score,
+                    ai_feedback: item.evaluation,
+                  });
+                }
+              } catch (e) {
+                console.error('[resume save] 저장 실패:', e);
+              }
+            }
+
             navigate('/resume/editor', {
               state: {
                 companyName,
                 jobTitle,
-                coverQuestions: coverQuestions.map((q) => q.text),
+                coverQuestions: qTexts,
                 drafts: updatedDrafts,
                 companyInsights,
                 selections: newSelections,
               },
             });
-          }, 1500);
+          };
+
+          await saveAndNavigate();
         }
       } else {
         setCoverMessages((prev) => [...prev, {
@@ -813,7 +892,7 @@ export default function ResumePage() {
             </div>
 
             <div className={styles.btnRow}>
-              <button className={styles.primaryBtn} onClick={handleStep3Continue}>
+              <button className={styles.primaryBtn} onClick={handleStep3SaveAndContinue}>
                 마이페이지 업데이트 후 자소서 작성
               </button>
               <button className={styles.secondaryBtn} onClick={handleStep3Continue}>
