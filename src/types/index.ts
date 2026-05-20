@@ -2,10 +2,10 @@
 // Auth
 // ────────────────────────────────────────────
 export interface User {
-  id: string;
+  id: number;
   email: string;
   name: string;
-  createdAt: string;
+  role?: string;
 }
 
 export interface AuthTokens {

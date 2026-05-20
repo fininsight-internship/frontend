@@ -122,10 +122,14 @@ export default function ResumePage() {
   const [jobTitle, setJobTitle] = useState('');
   const [coverQuestions, setCoverQuestions] = useState<{ text: string; charLimit: string }[]>([{ text: '', charLimit: '' }]);
   const [companyInsights, setCompanyInsights] = useState('');
-  const [currentQuestionIdx] = useState(0);
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+  const [allDrafts, setAllDrafts] = useState<Record<number, string>>({});
 
   // ─── Experience (Step 1) ──────────────────────────────────────
   const [selectedExp, setSelectedExp] = useState<Experience | null>(null);
+  const [matchScores, setMatchScores] = useState<Record<string, number>>({});
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchError, setMatchError] = useState(false);
 
   // ─── STAR chat (Step 3) ───────────────────────────────────────
   const [starIdx, setStarIdx] = useState(0);
@@ -147,6 +151,38 @@ export default function ResumePage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [starMessages, coverMessages, starLoading, coverLoading]);
+
+  // 경험 선택 단계 진입 시 현재 문항 기준 매칭율 로딩
+  useEffect(() => {
+    if (wizardStep !== 'step1') return;
+    const question = coverQuestions[currentQuestionIdx]?.text;
+    if (!question?.trim() || MOCK_EXPERIENCES.length === 0) return;
+
+    setMatchLoading(true);
+    setMatchScores({});
+    setMatchError(false);
+    api.post('/resume/experience-match', {
+      question,
+      experiences: MOCK_EXPERIENCES.map((e) => ({
+        id: e.id,
+        company: e.company,
+        role: e.role,
+        tags: e.tags,
+        starData: e.starData ?? null,
+      })),
+    }).then((res) => {
+      const scores = res.data.scores || {};
+      if (Object.keys(scores).length === 0) {
+        setMatchError(true);
+      } else {
+        setMatchScores(scores);
+      }
+    }).catch(() => {
+      setMatchError(true);
+    }).finally(() => {
+      setMatchLoading(false);
+    });
+  }, [wizardStep, currentQuestionIdx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Derived values ───────────────────────────────────────────
   const progressStep =
@@ -274,7 +310,9 @@ export default function ResumePage() {
   };
 
   // ─── Step 4: Cover letter chat ────────────────────────────────
-  const startCoverChat = async () => {
+  const startCoverChat = async (questionText?: string, charLimit?: number) => {
+    const q = questionText ?? currentCoverQ;
+    const limit = charLimit ?? currentCharLimit;
     setCoverMessages([]);
     setCoverSelections([]);
     setCoverInput('');
@@ -285,7 +323,8 @@ export default function ResumePage() {
       const res = await api.post('/resume/cover-chat', {
         company_name: companyName,
         job_title: jobTitle,
-        cover_question: currentCoverQ,
+        cover_question: q,
+        char_limit: limit,
         star_data: getStarData(),
         history: [],
         company_insights: companyInsights,
@@ -350,20 +389,41 @@ export default function ResumePage() {
 
       if (chatRes.data.is_complete) {
         setFinalLetter(draft);
-        setCoverMessages((prev) => [...prev, { role: 'assistant', content: '✅ 자소서 작성 완료! 에디터에서 수정할 수 있어요.' }]);
-        setWizardStep('done');
-        setTimeout(() => {
-          navigate('/resume/editor', {
-            state: {
-              companyName,
-              jobTitle,
-              coverQuestions: coverQuestions.map((q) => q.text),
-              drafts: { [currentQuestionIdx]: draft },
-              companyInsights,
-              selections: newSelections,
-            },
-          });
-        }, 1500);
+        const updatedDrafts = { ...allDrafts, [currentQuestionIdx]: draft };
+        setAllDrafts(updatedDrafts);
+
+        const nextIdx = currentQuestionIdx + 1;
+        const hasNextQuestion = nextIdx < coverQuestions.length;
+
+        if (hasNextQuestion) {
+          // 다음 문항을 위해 경험 재선택
+          const nextQ = coverQuestions[nextIdx];
+          setCoverMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: `✅ ${currentQuestionIdx + 1}번 문항 완료!\n\n📝 문항 ${nextIdx + 1}을 위한 경험을 선택해주세요:\n${nextQ.text}` },
+          ]);
+          setCurrentQuestionIdx(nextIdx);
+          setSelectedExp(null);
+          setTimeout(() => {
+            setWizardStep('step1');
+          }, 1200);
+        } else {
+          // 모든 문항 완료 → 에디터로 이동
+          setCoverMessages((prev) => [...prev, { role: 'assistant', content: '✅ 모든 문항 작성 완료! 에디터에서 수정할 수 있어요.' }]);
+          setWizardStep('done');
+          setTimeout(() => {
+            navigate('/resume/editor', {
+              state: {
+                companyName,
+                jobTitle,
+                coverQuestions: coverQuestions.map((q) => q.text),
+                drafts: updatedDrafts,
+                companyInsights,
+                selections: newSelections,
+              },
+            });
+          }, 1500);
+        }
       } else {
         setCoverMessages((prev) => [...prev, {
           role: 'assistant',
@@ -529,42 +589,69 @@ export default function ResumePage() {
                   <span className={styles.stepBadge}>경험 선택</span>
                 </div>
                 <p>
-                  <strong>{companyName} {jobTitle}</strong> 자소서에 활용할 <strong>핵심 경험</strong>을 선택해주세요.<br />
-                  선택한 경험을 중심으로 자소서 내용을 구성합니다.
+                  <strong>문항 {currentQuestionIdx + 1}</strong>에 활용할 <strong>핵심 경험</strong>을 선택해주세요.<br />
+                  <span className={styles.currentQuestionHint}>📝 {coverQuestions[currentQuestionIdx]?.text}</span>
                 </p>
+                {matchError && !matchLoading && (
+                  <p className={styles.matchErrorText}>매칭율 분석에 실패했습니다. 백엔드 서버를 확인해주세요.</p>
+                )}
               </div>
             </div>
 
-            <div className={styles.expList}>
-              {MOCK_EXPERIENCES.map((exp) => (
-                <label key={exp.id} className={`${styles.expCard} ${selectedExp?.id === exp.id ? styles.expCardSelected : ''}`}>
-                  <input type="radio" name="experience" checked={selectedExp?.id === exp.id} onChange={() => setSelectedExp(exp)} className={styles.radioHidden} />
-                  <div className={styles.expCardInner}>
-                    <div className={styles.radioCircle}>
-                      {selectedExp?.id === exp.id && <div className={styles.radioDot} />}
-                    </div>
-                    <div className={styles.expInfo}>
-                      <div className={styles.expHeader}>
-                        <span className={styles.expTypeBadge}>{exp.type}</span>
-                        <span className={`${styles.detailBadge} ${exp.hasDetail ? styles.detailDone : styles.detailMissing}`}>
-                          세부사항 {exp.hasDetail ? '입력됨' : '미입력'}
-                        </span>
+            <div className={styles.expListWrap}>
+              {matchLoading && (
+                <div className={styles.expListOverlay}>
+                  <Loader2 size={28} className={styles.spinner} color="var(--color-primary)" />
+                  <p className={styles.expListOverlayText}>매칭율 분석 중...</p>
+                </div>
+              )}
+              <div className={`${styles.expList} ${matchLoading ? styles.expListBlur : ''}`}>
+                {MOCK_EXPERIENCES.map((exp) => {
+                  const score = matchScores[exp.id];
+                  const scoreColor =
+                    score === undefined ? '' :
+                    score >= 75 ? styles.matchHigh :
+                    score >= 50 ? styles.matchMid :
+                    styles.matchLow;
+                  return (
+                    <label key={exp.id} className={`${styles.expCard} ${selectedExp?.id === exp.id ? styles.expCardSelected : ''}`}>
+                      <input type="radio" name="experience" checked={selectedExp?.id === exp.id} onChange={() => setSelectedExp(exp)} className={styles.radioHidden} />
+                      <div className={styles.expCardInner}>
+                        <div className={styles.radioCircle}>
+                          {selectedExp?.id === exp.id && <div className={styles.radioDot} />}
+                        </div>
+                        <div className={styles.expInfo}>
+                          <div className={styles.expHeader}>
+                            <span className={styles.expTypeBadge}>{exp.type}</span>
+                            <span className={`${styles.detailBadge} ${exp.hasDetail ? styles.detailDone : styles.detailMissing}`}>
+                              세부사항 {exp.hasDetail ? '입력됨' : '미입력'}
+                            </span>
+                            {score !== undefined && (
+                              <span className={`${styles.matchBadge} ${scoreColor}`}>
+                                매칭율 {score}%
+                              </span>
+                            )}
+                            {score === undefined && matchError && (
+                              <span className={styles.matchBadgePending}>매칭율 없음</span>
+                            )}
+                          </div>
+                          <div className={styles.expTitle}>
+                            <strong>{exp.company}</strong>
+                            <span className={styles.expPeriod}>{exp.period}</span>
+                          </div>
+                          <div className={styles.expRole}>{exp.role}</div>
+                          <div className={styles.tagList}>
+                            {exp.tags.map((t) => <span key={t} className={styles.tag}>{t}</span>)}
+                          </div>
+                        </div>
                       </div>
-                      <div className={styles.expTitle}>
-                        <strong>{exp.company}</strong>
-                        <span className={styles.expPeriod}>{exp.period}</span>
-                      </div>
-                      <div className={styles.expRole}>{exp.role}</div>
-                      <div className={styles.tagList}>
-                        {exp.tags.map((t) => <span key={t} className={styles.tag}>{t}</span>)}
-                      </div>
-                    </div>
-                  </div>
-                </label>
-              ))}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
-            <button className={styles.primaryBtn} onClick={handleStep1Next} disabled={!selectedExp}>
+            <button className={styles.primaryBtn} onClick={handleStep1Next} disabled={!selectedExp || matchLoading}>
               선택 완료
             </button>
           </div>
@@ -711,7 +798,22 @@ export default function ResumePage() {
             <div className={styles.coverLetterContent}>
               <div className={styles.coverLetterHeader}>
                 <h3 className={styles.coverLetterHeaderTitle}>자소서 작성 중</h3>
-                <p className={styles.coverLetterHeaderQuestion}>Q. {currentCoverQ}</p>
+                <div className={styles.questionTimeline}>
+                  {coverQuestions.map((q, i) => {
+                    const isActive = i === currentQuestionIdx;
+                    const isCompleted = allDrafts[i] != null;
+                    return (
+                      <div key={i} className={styles.timelineItem}>
+                        <p className={`${styles.coverLetterHeaderQuestion} ${isActive ? styles.timelineActive : ''} ${isCompleted ? styles.timelineCompleted : ''}`}>
+                          Q{i + 1}. {q.text}
+                        </p>
+                        {i < coverQuestions.length - 1 && (
+                          <div className={styles.timelineDivider} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {draftLetter ? (
