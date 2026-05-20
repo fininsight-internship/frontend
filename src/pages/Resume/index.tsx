@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, CheckCircle, Plus, Trash2, Send, Loader2 } from 'lucide-react';
 import api from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 import styles from './ResumePage.module.css';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -34,57 +35,6 @@ interface CoverMessage {
   aspect?: string;
 }
 
-// ─── Mock experience data ─────────────────────────────────────────
-const MOCK_EXPERIENCES: Experience[] = [
-  {
-    id: '1',
-    type: '경력/인턴',
-    company: '네이버 주식회사',
-    period: '2024.07 - 2024.08',
-    role: '프론트엔드 개발 인턴',
-    tags: ['React', 'TypeScript', 'React Query', 'Next.js'],
-    hasDetail: true,
-    starData: {
-      S: '20인 규모 프론트엔드 팀에서 신규 서비스 개발을 담당했습니다.',
-      T: '레거시 클래스형 컴포넌트를 함수형으로 전환하고 성능을 최적화해야 했습니다.',
-      A: 'React Query 도입으로 서버 상태 관리를 개선하고, Suspense 패턴으로 로딩 UX를 향상시켰습니다.',
-      R: '페이지 로드 시간 40% 단축, 코드 복잡도 30% 감소를 달성했습니다.',
-    },
-  },
-  {
-    id: '2',
-    type: '경력/인턴',
-    company: 'ABC 스타트업',
-    period: '2023.12 - 2024.02',
-    role: '풀스택 개발 인턴',
-    tags: ['Node.js', 'React', 'MongoDB'],
-    hasDetail: false,
-  },
-  {
-    id: '3',
-    type: '프로젝트',
-    company: '개인 프로젝트',
-    period: '2024.03 - 2024.06',
-    role: '투업 관리 플랫폼 개발',
-    tags: ['Next.js', 'PostgreSQL', 'Prisma', 'TailwindCSS'],
-    hasDetail: true,
-    starData: {
-      S: '팀원 3명과 함께 프리랜서를 위한 투업 관리 플랫폼을 기획 및 개발했습니다.',
-      T: '실시간 데이터 동기화와 복잡한 폼 관리 로직을 효율적으로 처리해야 했습니다.',
-      A: 'Next.js Server Actions와 Prisma ORM을 활용해 타입 안전한 API를 구축하고, React Hook Form으로 폼 성능을 최적화했습니다.',
-      R: '초기 사용자 50명 유치, 재방문율 68% 달성했습니다.',
-    },
-  },
-  {
-    id: '4',
-    type: '교육/부트캠프',
-    company: '우아한테크코스 5기',
-    period: '2023.02 - 2023.11',
-    role: '프론트엔드 과정',
-    tags: ['JavaScript', 'React', 'Java', 'Spring'],
-    hasDetail: false,
-  },
-];
 
 const STAR_STEPS: StarStep[] = ['S', 'T', 'A', 'R'];
 const STAR_LABELS: Record<StarStep, string> = { S: 'S — 상황', T: 'T — 과제', A: 'A — 행동', R: 'R — 결과' };
@@ -111,6 +61,7 @@ const STEP_LABELS = ['경험 선택', '경험 사항 확인', 'STAR 경험 정�
 
 export default function ResumePage() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   // ─── Step state ───────────────────────────────────────────────
   const [wizardStep, setWizardStep] = useState<WizardStep>('setup');
@@ -125,6 +76,8 @@ export default function ResumePage() {
   const [allDrafts, setAllDrafts] = useState<Record<number, string>>({});
 
   // ─── Experience (Step 1) ──────────────────────────────────────
+  const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [expLoading, setExpLoading] = useState(false);
   const [selectedExp, setSelectedExp] = useState<Experience | null>(null);
   const [matchScores, setMatchScores] = useState<Record<string, number>>({});
   const [matchLoading, setMatchLoading] = useState(false);
@@ -151,18 +104,73 @@ export default function ResumePage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [starMessages, coverMessages, starLoading, coverLoading]);
 
+  // 경험 DB 로드 (마운트 시 1회)
+  useEffect(() => {
+    if (!user?.id) return;
+    setExpLoading(true);
+    api.get('/experience').then((res) => {
+      const data = res.data;
+      const mapped: Experience[] = [];
+
+      (data['경력인턴'] || []).forEach((c: { id: string; company: string; department: string; startDate: string; endDate: string; detail: string }) => {
+        if (!c.company?.trim() && !c.department?.trim()) return;
+        mapped.push({
+          id: c.id,
+          type: '경력/인턴',
+          company: c.company || '',
+          period: [c.startDate, c.endDate].filter(Boolean).join(' - '),
+          role: c.department || '',
+          tags: [],
+          hasDetail: false,
+        });
+      });
+
+      (data['교육부트캠프'] || []).forEach((b: { id: string; name: string; topic: string; detail: string }) => {
+        if (!b.name?.trim()) return;
+        mapped.push({
+          id: b.id,
+          type: '교육/부트캠프',
+          company: b.name || '',
+          period: '',
+          role: b.topic || '',
+          tags: [],
+          hasDetail: false,
+        });
+      });
+
+      (data['프로젝트'] || []).forEach((p: { id: string; title: string; detail: string }) => {
+        if (!p.title?.trim()) return;
+        mapped.push({
+          id: p.id,
+          type: '프로젝트',
+          company: p.title || '',
+          period: '',
+          role: p.title || '',
+          tags: [],
+          hasDetail: false,
+        });
+      });
+
+      setExperiences(mapped);
+    }).catch(() => {
+      // DB 로드 실패 시 빈 목록 유지
+    }).finally(() => {
+      setExpLoading(false);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 경험 선택 단계 진입 시 현재 문항 기준 매칭율 로딩
   useEffect(() => {
     if (wizardStep !== 'step1') return;
     const question = coverQuestions[currentQuestionIdx]?.text;
-    if (!question?.trim() || MOCK_EXPERIENCES.length === 0) return;
+    if (!question?.trim() || experiences.length === 0) return;
 
     setMatchLoading(true);
     setMatchScores({});
     setMatchError(false);
     api.post('/resume/experience-match', {
       question,
-      experiences: MOCK_EXPERIENCES.map((e) => ({
+      experiences: experiences.map((e) => ({
         id: e.id,
         company: e.company,
         role: e.role,
@@ -181,7 +189,7 @@ export default function ResumePage() {
     }).finally(() => {
       setMatchLoading(false);
     });
-  }, [wizardStep, currentQuestionIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wizardStep, currentQuestionIdx, experiences]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Derived values ───────────────────────────────────────────
   const progressStep =
@@ -207,12 +215,30 @@ export default function ResumePage() {
     if (!companyName.trim() || !jobTitle.trim()) return;
     setSetupPhase('analyzing');
     try {
-      const res = await api.get(`/company/report?company=${encodeURIComponent(companyName)}&job=${encodeURIComponent(jobTitle)}`);
-      if (res.data?.data) {
-        const d = res.data.data;
-        const parts = [d.summary, ...(d.issues || []), d.culture?.description || ''].filter(Boolean);
-        setCompanyInsights(parts.join('\n'));
+      const [reportRes, jdRes] = await Promise.allSettled([
+        api.get(`/company/report?company=${encodeURIComponent(companyName)}&job=${encodeURIComponent(jobTitle)}`),
+        user?.id
+          ? api.get('/resume/jd-info', { params: { user_id: user.id, company_name: companyName, job_role: jobTitle } })
+          : Promise.reject('no user'),
+      ]);
+
+      const parts: string[] = [];
+
+      if (reportRes.status === 'fulfilled' && reportRes.value.data?.data) {
+        const d = reportRes.value.data.data;
+        parts.push(...([d.summary, ...(d.issues || []), d.culture?.description || ''].filter(Boolean)));
       }
+
+      if (jdRes.status === 'fulfilled' && jdRes.value.data?.status === 'success') {
+        const { jd_content, analysis_report } = jdRes.value.data;
+        if (jd_content) parts.push(`[JD 원문]\n${jd_content}`);
+        if (analysis_report) {
+          const report = typeof analysis_report === 'string' ? analysis_report : JSON.stringify(analysis_report);
+          parts.push(`[JD 분석]\n${report}`);
+        }
+      }
+
+      if (parts.length > 0) setCompanyInsights(parts.join('\n'));
     } catch (_) {
       // proceed even without insights
     }
@@ -602,14 +628,17 @@ export default function ResumePage() {
             </div>
 
             <div className={styles.expListWrap}>
-              {matchLoading && (
+              {(matchLoading || expLoading) && (
                 <div className={styles.expListOverlay}>
                   <Loader2 size={28} className={styles.spinner} color="var(--color-primary)" />
-                  <p className={styles.expListOverlayText}>매칭율 분석 중...</p>
+                  <p className={styles.expListOverlayText}>{expLoading ? '경험 데이터 로딩 중...' : '매칭율 분석 중...'}</p>
                 </div>
               )}
-              <div className={`${styles.expList} ${matchLoading ? styles.expListBlur : ''}`}>
-                {MOCK_EXPERIENCES.map((exp) => {
+              <div className={`${styles.expList} ${(matchLoading || expLoading) ? styles.expListBlur : ''}`}>
+                {experiences.length === 0 && !expLoading && (
+                  <p className={styles.matchErrorText}>등록된 경험이 없습니다. 마이페이지에서 경험을 먼저 등록해주세요.</p>
+                )}
+                {experiences.map((exp) => {
                   const score = matchScores[exp.id];
                   const scoreColor =
                     score === undefined ? '' :
@@ -654,7 +683,7 @@ export default function ResumePage() {
               </div>
             </div>
 
-            <button className={styles.primaryBtn} onClick={handleStep1Next} disabled={!selectedExp || matchLoading}>
+            <button className={styles.primaryBtn} onClick={handleStep1Next} disabled={!selectedExp || matchLoading || expLoading}>
               선택 완료
             </button>
           </div>
