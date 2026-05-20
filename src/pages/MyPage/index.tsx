@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Check } from 'lucide-react';
 import api from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 import styles from './MyPage.module.css';
 
 type Section = '개인정보' | '경험관리' | '구독관리' | '알림설정';
@@ -152,11 +153,7 @@ function ExperienceSection() {
     });
   }
 
-  // 저장 내역이 없는 경우 가이드용 기본 데이터 노출
-  const displayExps = exps.length > 0 ? exps : [
-    { id: '1', title: '네이버 주식회사 (프론트엔드 개발 인턴)', detail: 'React Query 최적화 및 공통 컴포넌트 라이브러리 기여', category: '경력인턴', categoryLabel: '경력 / 인턴' },
-    { id: '2', title: '실시간 취업 코칭 플랫폼 CareerAI 프로젝트', detail: '이력서 RAG 매칭 및 피드백 대시보드 설계', category: '프로젝트', categoryLabel: '프로젝트' }
-  ];
+  const displayExps = exps;
 
   const handleClick = (categoryKey: string) => {
     navigate('/experience/edit', {
@@ -193,25 +190,31 @@ function ExperienceSection() {
       </div>
 
       <div className={styles.expList}>
-        {displayExps.map((exp) => (
-          <div key={exp.id} className={`${styles.expCard} ${styles.expCardClickable}`} onClick={() => handleClick(exp.category)}>
-            <div>
-              <p className={styles.expCompany} style={{ fontWeight: '700', color: 'var(--color-text)' }}>{exp.title}</p>
-              <p className={styles.expRole} style={{ fontSize: '0.82rem', color: 'var(--color-primary)', fontWeight: '600', marginTop: '2px' }}>
-                📂 {exp.categoryLabel}
-              </p>
-              <p className={styles.expPeriod} style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                {exp.detail || '상세 세부 경험 내용이 작성되지 않았습니다. 클릭하여 작성해 주세요.'}
-              </p>
-            </div>
-            <div className={styles.expRight}>
-              <span className={`${styles.starBadge} ${exp.detail ? styles.starDone : styles.starMissing}`}>
-                {exp.detail ? '상세내용 입력됨' : '상세내용 미입력'}
-              </span>
-              <ChevronRight size={16} className={styles.expChevron} />
-            </div>
+        {displayExps.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)', fontSize: '0.88rem' }}>
+            등록된 경험이 없습니다. 위의 버튼을 눌러 경험을 등록해보세요.
           </div>
-        ))}
+        ) : (
+          displayExps.map((exp) => (
+            <div key={exp.id} className={`${styles.expCard} ${styles.expCardClickable}`} onClick={() => handleClick(exp.category)}>
+              <div>
+                <p className={styles.expCompany} style={{ fontWeight: '700', color: 'var(--color-text)' }}>{exp.title}</p>
+                <p className={styles.expRole} style={{ fontSize: '0.82rem', color: 'var(--color-primary)', fontWeight: '600', marginTop: '2px' }}>
+                  📂 {exp.categoryLabel}
+                </p>
+                <p className={styles.expPeriod} style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                  {exp.detail || '상세 내용이 없습니다. 클릭하여 작성해주세요.'}
+                </p>
+              </div>
+              <div className={styles.expRight}>
+                <span className={`${styles.starBadge} ${exp.detail ? styles.starDone : styles.starMissing}`}>
+                  {exp.detail ? '상세내용 입력됨' : '상세내용 미입력'}
+                </span>
+                <ChevronRight size={16} className={styles.expChevron} />
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
