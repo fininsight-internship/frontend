@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -9,8 +9,19 @@ import {
   Trash2,
 } from 'lucide-react';
 import styles from './AnalysisPage.module.css';
+import { getSavedReports, toggleStarReport, deleteReport } from '../../services/analysis';
 
-/* ─── Mock data ─── */
+/* ─── Company Colors ─── */
+const COMPANY_COLORS = ['#FACC15', '#22C55E', '#3B82F6', '#F59E0B', '#EC4899', '#8B5CF6'];
+const getCompanyColor = (companyName: string) => {
+  let hash = 0;
+  for (let i = 0; i < companyName.length; i++) {
+    hash = companyName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % COMPANY_COLORS.length;
+  return COMPANY_COLORS[index];
+};
+
 interface SavedReport {
   id: string;
   company: string;
@@ -21,6 +32,7 @@ interface SavedReport {
   score: number;
   date: string;
   starred: boolean;
+  rawData: any;
 }
 
 const MOCK_REPORTS: SavedReport[] = [
@@ -76,9 +88,43 @@ export default function AnalysisPage() {
   const [companyName, setCompanyName] = useState('');
   const [jdUrl, setJdUrl] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('all');
-  const [reports, setReports] = useState<SavedReport[]>(MOCK_REPORTS);
+  const [reports, setReports] = useState<SavedReport[]>([]);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const data = await getSavedReports();
+        const mapped: SavedReport[] = data.map((item) => {
+          const comp = item.company_name || '분석 기업';
+          const dateObj = item.created_at ? new Date(item.created_at) : new Date();
+          const formattedDate = `${dateObj.getFullYear()}.${String(dateObj.getMonth() + 1).padStart(2, '0')}.${String(dateObj.getDate()).padStart(2, '0')}`;
+          
+          const techStacks = item.job_analysis?.tech_stacks || [];
+          const competencyTags = item.company_analysis?.required_competencies_from_company || [];
+          const tags = [...techStacks.slice(0, 2), ...competencyTags.slice(0, 1)];
+
+          return {
+            id: String(item.id),
+            company: comp,
+            companyInitial: comp[0] || '기',
+            companyColor: getCompanyColor(comp),
+            position: item.job_role || '지원 직무',
+            tags: tags.length > 0 ? tags : ['직무분석', '역량분석'],
+            score: item.fit_analysis?.score || 80,
+            date: formattedDate,
+            starred: !!item.is_starred,
+            rawData: item
+          };
+        });
+        setReports(mapped);
+      } catch (err) {
+        console.error('리포트 조회 실패:', err);
+      }
+    };
+    fetchReports();
+  }, []);
 
   const filteredReports = reports.filter((r) => {
     if (activeTab === 'starred') return r.starred;
@@ -89,20 +135,15 @@ export default function AnalysisPage() {
   const handleAnalysis = () => {
     if (!companyName.trim()) return;
     
+    const query = new URLSearchParams({
+      company: companyName,
+      jdUrl: jdUrl
+    }).toString();
+    
     if (resumeFile) {
-      // Option A: File uploaded, skip chat, go straight to report
-      const query = new URLSearchParams({
-        company: companyName,
-        jdUrl: jdUrl
-      }).toString();
       navigate(`/analysis/report?${query}`, { state: { resumeFile } });
     } else {
-      // No file, proceed to chat
-      const query = new URLSearchParams({
-        company: companyName,
-        jdUrl: jdUrl
-      }).toString();
-      navigate(`/analysis/chat?${query}`);
+      navigate(`/analysis/report?${query}`);
     }
   };
 
@@ -116,14 +157,33 @@ export default function AnalysisPage() {
     fileInputRef.current?.click();
   };
 
-  const toggleStar = (id: string) => {
-    setReports((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, starred: !r.starred } : r))
-    );
+  const handleViewReport = (report: SavedReport) => {
+    const query = new URLSearchParams({
+      company: report.company,
+      jdUrl: report.rawData.job_analysis?.jd_url || ''
+    }).toString();
+    navigate(`/analysis/report?${query}`, { state: { reportData: report.rawData } });
   };
 
-  const deleteReport = (id: string) => {
-    setReports((prev) => prev.filter((r) => r.id !== id));
+  const toggleStar = async (id: string) => {
+    try {
+      const isStarred = await toggleStarReport(Number(id));
+      setReports((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, starred: isStarred } : r))
+      );
+    } catch (err) {
+      console.error('즐겨찾기 토글 실패:', err);
+    }
+  };
+
+  const deleteReportHandler = async (id: string) => {
+    if (!window.confirm('정말로 이 리포트를 삭제하시겠습니까?')) return;
+    try {
+      await deleteReport(Number(id));
+      setReports((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      console.error('리포트 삭제 실패:', err);
+    }
   };
 
   const getScoreColor = (score: number) => {
@@ -271,13 +331,13 @@ export default function AnalysisPage() {
                 <div className={styles.reportMeta}>
                   <span className={styles.reportDate}>{report.date}</span>
                   <div className={styles.reportActions}>
-                    <button className={styles.actionBtn}>
+                    <button className={styles.actionBtn} onClick={() => handleViewReport(report)}>
                       <Eye size={14} />
                       보기
                     </button>
                     <button
                       className={`${styles.actionBtn} ${styles.deleteBtn}`}
-                      onClick={() => deleteReport(report.id)}
+                      onClick={() => deleteReportHandler(report.id)}
                     >
                       <Trash2 size={14} />
                       삭제

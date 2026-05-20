@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { analyzeJobAndResume, type AnalysisResponseData } from '../../services/analysis';
 import SuitabilityScore from '../../components/Report/SuitabilityScore';
@@ -31,14 +31,33 @@ export default function AnalysisReportPage() {
   const resumeFile = location.state?.resumeFile || null;
 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'company' | 'jd' | 'competency'>('company');
+  const [activeTab, setActiveTab] = useState<'company' | 'jd_matching'>('company');
 
   // Reports states
   const [jdReport, setJdReport] = useState<AnalysisResponseData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchRef = useRef(false);
+  const prevParamsRef = useRef({ companyName, jdUrl, resumeText });
+
   useEffect(() => {
+    if (location.state?.reportData) {
+      setJdReport(location.state.reportData);
+      setLoading(false);
+      return;
+    }
+
     if (!companyName) return;
+
+    const paramsChanged =
+      prevParamsRef.current.companyName !== companyName ||
+      prevParamsRef.current.jdUrl !== jdUrl ||
+      prevParamsRef.current.resumeText !== resumeText;
+
+    if (fetchRef.current && !paramsChanged) return;
+
+    fetchRef.current = true;
+    prevParamsRef.current = { companyName, jdUrl, resumeText };
 
     const fetchAllReports = async () => {
       setLoading(true);
@@ -59,7 +78,7 @@ export default function AnalysisReportPage() {
     };
 
     fetchAllReports();
-  }, [companyName, jdUrl, resumeText]);
+  }, [companyName, jdUrl, resumeText, location.state?.reportData]);
 
   if (loading) {
     return (
@@ -113,7 +132,7 @@ export default function AnalysisReportPage() {
         </div>
 
         {/* Tab Selection */}
-        <div className="flex bg-slate-200/50 p-1.5 rounded-2xl mb-8 max-w-lg border border-slate-200/40">
+        <div className="flex bg-slate-200/50 p-1.5 rounded-2xl mb-8 max-w-md border border-slate-200/40">
           <button
             onClick={() => setActiveTab('company')}
             className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 ${
@@ -123,29 +142,18 @@ export default function AnalysisReportPage() {
             }`}
           >
             <Building2 className="w-4 h-4" />
-            기업 분석
+            기업분석 보고서
           </button>
           <button
-            onClick={() => setActiveTab('jd')}
+            onClick={() => setActiveTab('jd_matching')}
             className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 ${
-              activeTab === 'jd' 
+              activeTab === 'jd_matching' 
                 ? 'bg-white text-indigo-600 shadow-sm font-extrabold border border-indigo-50/50' 
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Briefcase className="w-4 h-4" />
-            JD 분석
-          </button>
-          <button
-            onClick={() => setActiveTab('competency')}
-            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 ${
-              activeTab === 'competency' 
-                ? 'bg-white text-indigo-600 shadow-sm font-extrabold border border-indigo-50/50' 
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Award className="w-4 h-4" />
-            지원 및 매칭 전략
+            JD매칭 분석
           </button>
         </div>
 
@@ -224,74 +232,7 @@ export default function AnalysisReportPage() {
             </div>
           )}
 
-          {activeTab === 'jd' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* JD Core Requirements */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2.5 border-b border-slate-100 pb-3">
-                  <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                  채용 공고 핵심 요구 사항
-                </h3>
-                <div className="space-y-3">
-                  {jdReport.job_analysis.core_requirements.map((req, idx) => (
-                    <div key={idx} className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full">
-                        {idx + 1}
-                      </span>
-                      <p className="text-slate-700 text-xs leading-relaxed font-semibold">{req}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* JD Preferred Qualifications */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2.5 border-b border-slate-100 pb-3">
-                  <ThumbsUp className="w-5 h-5 text-indigo-600" />
-                  주요 우대 사항 (Preferred Qualifications)
-                </h3>
-                <div className="space-y-3">
-                  {jdReport.job_analysis.preferred_qualifications.map((pref, idx) => (
-                    <div key={idx} className="flex items-start gap-2.5 bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/50">
-                      <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
-                        {idx + 1}
-                      </span>
-                      <p className="text-slate-700 text-xs leading-relaxed font-semibold">{pref}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Required Tech Stacks */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 md:col-span-2">
-                <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2.5">
-                  <Cpu className="w-5 h-5 text-indigo-600" />
-                  요구 기술 스택 (Skills & Technologies)
-                </h3>
-                <div className="flex flex-wrap gap-2.5 mt-4">
-                  {jdReport.job_analysis.tech_stacks.map((skill, idx) => (
-                    <span 
-                      key={idx} 
-                      className="px-3.5 py-1.5 bg-slate-100 text-slate-700 text-xs font-black rounded-lg border border-slate-200 transition hover:bg-slate-200"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Job Strategic Importance */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 md:col-span-2">
-                <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2.5 border-b border-slate-100 pb-3">
-                  <ScrollText className="w-5 h-5 text-indigo-600" />
-                  해당 직무의 비즈니스 및 전략적 가치
-                </h3>
-                <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{jdReport.job_analysis.strategic_importance}</p>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'competency' && (
+          {activeTab === 'jd_matching' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Suitability Score */}
               <div className="md:col-span-1">
@@ -313,6 +254,69 @@ export default function AnalysisReportPage() {
                   <ShieldCheck className="w-4 h-4 text-indigo-600" />
                   <span>이 리포트는 AI 채용 엔진이 지원자 이력서와 기업 JD의 핵심 요구치를 실시간 대조하여 산정했습니다.</span>
                 </div>
+              </div>
+
+              {/* JD Core Requirements */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 md:col-span-1">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                  <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                  채용 공고 핵심 요구 사항
+                </h3>
+                <div className="space-y-3">
+                  {jdReport.job_analysis.core_requirements.map((req, idx) => (
+                    <div key={idx} className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full">
+                        {idx + 1}
+                      </span>
+                      <p className="text-slate-700 text-xs leading-relaxed font-semibold">{req}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* JD Preferred Qualifications */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 md:col-span-1">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                  <ThumbsUp className="w-5 h-5 text-indigo-600" />
+                  주요 우대 사항 (Preferred Qualifications)
+                </h3>
+                <div className="space-y-3">
+                  {jdReport.job_analysis.preferred_qualifications.map((pref, idx) => (
+                    <div key={idx} className="flex items-start gap-2.5 bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/50">
+                      <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
+                        {idx + 1}
+                      </span>
+                      <p className="text-slate-700 text-xs leading-relaxed font-semibold">{pref}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Required Tech Stacks */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 md:col-span-1">
+                <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2.5">
+                  <Cpu className="w-5 h-5 text-indigo-600" />
+                  요구 기술 스택 (Skills & Technologies)
+                </h3>
+                <div className="flex flex-wrap gap-2.5 mt-4">
+                  {jdReport.job_analysis.tech_stacks.map((skill, idx) => (
+                    <span 
+                      key={idx} 
+                      className="px-3.5 py-1.5 bg-slate-100 text-slate-700 text-xs font-black rounded-lg border border-slate-200 transition hover:bg-slate-200"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Job Strategic Importance */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 md:col-span-3">
+                <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                  <ScrollText className="w-5 h-5 text-indigo-600" />
+                  해당 직무의 비즈니스 및 전략적 가치
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{jdReport.job_analysis.strategic_importance}</p>
               </div>
 
               {/* Competency Radar Chart */}
