@@ -156,16 +156,21 @@ export default function InterviewDetail() {
   };
 
   const handleFollowUp = async () => {
-    if (!activeQuestion || !activeQuestion.userAnswer?.trim()) return;
+    if (!activeQuestion || !activeQuestion.userAnswer?.trim() || !activeQuestion.feedback) return;
     setLoadingFollowUp(prev => ({ ...prev, [activeQuestion.id]: true }));
     try {
+      const existingFollowUps = (activeQuestion.followUps || []).map(fu => fu.question);
       const res = await interviewService.getFollowUp(
         position.company, position.job_role,
         activeQuestion.question, activeQuestion.userAnswer,
-        undefined, analysisId, resumeId
+        undefined, analysisId, resumeId, existingFollowUps
       );
+      const nextFollowUp = res.follow_up_questions?.[0];
+      if (!nextFollowUp) return;
       setQuestions(prev => prev.map(item =>
-        item.id === activeQuestion.id ? { ...item, followUps: res.follow_up_questions } : item
+        item.id === activeQuestion.id
+          ? { ...item, followUps: [...(item.followUps || []), nextFollowUp] }
+          : item
       ));
     } catch {
       alert('꼬리질문 요청에 실패했습니다.');
@@ -227,6 +232,25 @@ export default function InterviewDetail() {
         }
         return x;
       }));
+    }
+  };
+
+  const handleDeleteFollowUp = (questionIndex: number, fuIndex: number) => {
+    const question = questions[questionIndex];
+    const followUp = question?.followUps?.[fuIndex];
+    if (!question || !followUp) return;
+    if (!window.confirm('꼬리질문과 작성한 답변, 피드백을 삭제할까요?')) return;
+
+    setQuestions(prev => prev.map((item, idx) => (
+      idx === questionIndex
+        ? { ...item, followUps: (item.followUps || []).filter((_, itemIndex) => itemIndex !== fuIndex) }
+        : item
+    )));
+
+    if (state.sessionId && followUp.id) {
+      interviewService.deleteSessionFollowUp(state.sessionId, question.id, followUp.id).catch(() => {
+        alert('꼬리질문 삭제에 실패했습니다. 새로고침 후 다시 시도해주세요.');
+      });
     }
   };
 
@@ -667,13 +691,6 @@ export default function InterviewDetail() {
                 <div className={styles.charCount}>{(activeQuestion.userAnswer || '').length} / 400자 권장</div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button 
-                    className={styles.secondaryBtn}
-                    onClick={handleFollowUp}
-                    disabled={!(activeQuestion.userAnswer || '').trim() || loadingFollowUp[activeQuestion.id]}
-                  >
-                    {loadingFollowUp[activeQuestion.id] ? '생성 중...' : '⚡ 꼬리질문 예측'}
-                  </button>
-                  <button 
                     className={styles.feedbackBtn}
                     onClick={handleFeedback}
                     disabled={!(activeQuestion.userAnswer || '').trim() || loadingFeedback[activeQuestion.id]}
@@ -718,6 +735,28 @@ export default function InterviewDetail() {
                     <p className={styles.riskText} style={{ color: '#60a5fa' }}>
                       <strong>예상 꼬리질문 힌트:</strong> {(activeQuestion.feedback as AnswerFeedback).follow_up_hint}
                     </p>
+                    <button
+                      className={styles.followUpHintBtn}
+                      onClick={handleFollowUp}
+                      disabled={!(activeQuestion.userAnswer || '').trim() || loadingFollowUp[activeQuestion.id]}
+                    >
+                      {loadingFollowUp[activeQuestion.id]
+                        ? '생성 중...'
+                        : '꼬리질문 받기'}
+                    </button>
+                  </div>
+                )}
+                {!((activeQuestion.feedback as AnswerFeedback).follow_up_hint) && (
+                  <div className={styles.feedbackActionRow}>
+                    <button
+                      className={styles.followUpHintBtn}
+                      onClick={handleFollowUp}
+                      disabled={!(activeQuestion.userAnswer || '').trim() || loadingFollowUp[activeQuestion.id]}
+                    >
+                      {loadingFollowUp[activeQuestion.id]
+                        ? '생성 중...'
+                        : '꼬리질문 받기'}
+                    </button>
                   </div>
                 )}
               </div>
@@ -726,10 +765,29 @@ export default function InterviewDetail() {
             {/* Follow-up questions */}
             {activeQuestion.followUps && (activeQuestion.followUps as FollowUpQuestion[]).length > 0 && (
               <div className={styles.followUpSection}>
-                <h3 className={styles.followUpTitle}>⚡ 예상 압박 꼬리질문</h3>
+                <div className={styles.followUpHeader}>
+                  <h3 className={styles.followUpTitle}>예상 꼬리질문</h3>
+                  <button
+                    className={styles.followUpMoreBtn}
+                    onClick={handleFollowUp}
+                    disabled={!(activeQuestion.userAnswer || '').trim() || loadingFollowUp[activeQuestion.id]}
+                  >
+                    {loadingFollowUp[activeQuestion.id] ? '생성 중...' : '다른 꼬리질문 받기'}
+                  </button>
+                </div>
                 {(activeQuestion.followUps as FollowUpQuestion[]).map((fu, idx) => (
                   <div key={idx} className={styles.followUpItem}>
-                    <div className={styles.followUpQ}>Q. {fu.question}</div>
+                    <div className={styles.followUpItemHeader}>
+                      <div className={styles.followUpQ}>Q. {fu.question}</div>
+                      <button
+                        className={styles.followUpDeleteBtn}
+                        onClick={() => handleDeleteFollowUp(activeQuestionIndex, idx)}
+                        aria-label="꼬리질문 삭제"
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    </div>
                     <div className={styles.followUpIntent}>확인 포인트: {fu.intent}</div>
                     
                     <div className={styles.fuAnswerArea}>

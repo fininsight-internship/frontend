@@ -146,7 +146,8 @@ export const interviewService = {
     userAnswer: string,
     resumeExcerpt?: string,
     analysisId?: number,
-    resumeId?: number
+    resumeId?: number,
+    existingFollowUps?: string[]
   ): Promise<{ follow_up_questions: FollowUpQuestion[] }> => {
     const { data } = await api.post('/interview/follow-up', {
       company,
@@ -156,6 +157,7 @@ export const interviewService = {
       resume_excerpt: resumeExcerpt,
       analysis_id: analysisId,
       resume_id: resumeId,
+      existing_follow_ups: existingFollowUps,
     });
     return data;
   },
@@ -204,6 +206,16 @@ export const interviewService = {
     questionId: string
   ): Promise<{ message: string }> => {
     const { data } = await api.delete(`/interview/sessions/${sessionId}/questions/${questionId}`);
+    return data;
+  },
+
+  /** 저장된 세션에서 꼬리질문 삭제 */
+  deleteSessionFollowUp: async (
+    sessionId: string,
+    questionId: string,
+    followUpId: number
+  ): Promise<{ message: string }> => {
+    const { data } = await api.delete(`/interview/sessions/${sessionId}/questions/${questionId}/follow-ups/${followUpId}`);
     return data;
   },
 

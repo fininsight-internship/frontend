@@ -182,6 +182,7 @@ export interface InterviewSession {
 
 /** 압박 꼬리질문 */
 export interface FollowUpQuestion {
+  id?: number;
   question: string;
   intent: string;
   userAnswer?: string;
