@@ -9,6 +9,7 @@ import type {
   InterviewQuestion,
   MockContextResponse,
   InterviewSession,
+  InterviewSourcesResponse,
 } from '../types';
 
 export const interviewService = {
@@ -18,11 +19,24 @@ export const interviewService = {
     return data;
   },
 
+  /** DB에 저장된 JD/기업분석 및 자소서 소스 목록 */
+  getSources: async (): Promise<InterviewSourcesResponse> => {
+    const { data } = await api.get('/interview/sources');
+    return data;
+  },
+
   /** 평가축 추론 — JD + 기업분석 + 자소서 RAG 기반 */
-  evaluateAxes: async (company: string, jobRole: string): Promise<EvaluateAxesResponse> => {
+  evaluateAxes: async (
+    company: string,
+    jobRole: string,
+    analysisId?: number,
+    resumeId?: number
+  ): Promise<EvaluateAxesResponse> => {
     const { data } = await api.post('/interview/evaluate-axes', {
       company,
       job_role: jobRole,
+      analysis_id: analysisId,
+      resume_id: resumeId,
     });
     return data;
   },
@@ -32,13 +46,17 @@ export const interviewService = {
     company: string, 
     jobRole: string,
     interviewType: string = "전체",
-    axisType: string = "static"
+    axisType: string = "static",
+    analysisId?: number,
+    resumeId?: number
   ): Promise<QuestionsResponse> => {
     const { data } = await api.post('/interview/questions', {
       company,
       job_role: jobRole,
       interview_type: interviewType,
-      axis_type: axisType
+      axis_type: axisType,
+      analysis_id: analysisId,
+      resume_id: resumeId,
     }, {
       timeout: 90000 // 90 seconds specific timeout for heavy multi-stage LLM generation
     });
@@ -71,7 +89,9 @@ export const interviewService = {
     jobRole: string,
     question: string,
     userAnswer: string,
-    featureWeights?: Record<string, number>
+    featureWeights?: Record<string, number>,
+    analysisId?: number,
+    resumeId?: number
   ): Promise<AnswerFeedback> => {
     const { data } = await api.post('/interview/feedback', {
       company,
@@ -79,6 +99,8 @@ export const interviewService = {
       question,
       user_answer: userAnswer,
       feature_weights: featureWeights,
+      analysis_id: analysisId,
+      resume_id: resumeId,
     });
     return data;
   },
@@ -89,7 +111,9 @@ export const interviewService = {
     jobRole: string,
     question: string,
     userAnswer: string,
-    resumeExcerpt?: string
+    resumeExcerpt?: string,
+    analysisId?: number,
+    resumeId?: number
   ): Promise<{ follow_up_questions: FollowUpQuestion[] }> => {
     const { data } = await api.post('/interview/follow-up', {
       company,
@@ -97,6 +121,8 @@ export const interviewService = {
       question,
       user_answer: userAnswer,
       resume_excerpt: resumeExcerpt,
+      analysis_id: analysisId,
+      resume_id: resumeId,
     });
     return data;
   },

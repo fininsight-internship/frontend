@@ -128,6 +128,37 @@ export interface QuestionsResponse {
   axes_used: EvaluationAxis[];
 }
 
+export interface InterviewAnalysisSource {
+  id: number;
+  company_name: string;
+  job_role: string;
+  created_at?: string | null;
+  company_analysis?: Record<string, unknown>;
+  job_analysis?: Record<string, unknown>;
+  fit_analysis?: Record<string, unknown>;
+  document_optimization?: Record<string, unknown>;
+}
+
+export interface InterviewResumeSource {
+  id: number;
+  title: string;
+  company_name: string;
+  job_role: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+  raw_content?: string;
+  questions?: {
+    id: number;
+    question_text: string;
+    draft_content: string;
+  }[];
+}
+
+export interface InterviewSourcesResponse {
+  analyses: InterviewAnalysisSource[];
+  resumes: InterviewResumeSource[];
+}
+
 export interface InterviewSession {
   id: string;
   company: string;

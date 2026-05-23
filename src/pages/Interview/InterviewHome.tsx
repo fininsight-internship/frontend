@@ -1,29 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { interviewService } from '../../services/interviewService';
-import type { AvailablePosition, InterviewSession } from '../../types';
+import type { AvailablePosition, InterviewAnalysisSource, InterviewResumeSource, InterviewSession } from '../../types';
 import styles from './InterviewHome.module.css';
 
 export default function InterviewHome() {
   const navigate = useNavigate();
-  const [positions, setPositions] = useState<AvailablePosition[]>([]);
+  const [analyses, setAnalyses] = useState<InterviewAnalysisSource[]>([]);
+  const [resumes, setResumes] = useState<InterviewResumeSource[]>([]);
   const [sessions, setSessions] = useState<InterviewSession[]>([]);
-  const [selectedPosId, setSelectedPosId] = useState<string>('');
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string>('');
+  const [selectedResumeId, setSelectedResumeId] = useState<string>('');
   const [interviewType, setInterviewType] = useState<string>('전체');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [posData, sessData] = await Promise.all([
-          interviewService.getPositions(),
+        const [sourceData, sessData] = await Promise.all([
+          interviewService.getSources(),
           interviewService.getSessions()
         ]);
-        setPositions(posData);
+        setAnalyses(sourceData.analyses);
+        setResumes(sourceData.resumes);
         setSessions(sessData);
-        if (posData.length > 0) {
-          setSelectedPosId(posData[0].id);
-        }
       } catch (err) {
         console.error('Failed to load data', err);
       }
@@ -32,17 +32,41 @@ export default function InterviewHome() {
   }, []);
 
   const handleStartInterview = async (axisType: "static" | "dynamic") => {
-    const pos = positions.find(p => p.id === selectedPosId);
-    if (!pos) return;
+    const selectedAnalysis = analyses.find(item => String(item.id) === selectedAnalysisId);
+    const selectedResume = resumes.find(item => String(item.id) === selectedResumeId);
+    if (!selectedAnalysis) {
+      alert('JD/기업분석을 선택해주세요. 자소서는 선택하지 않아도 됩니다.');
+      return;
+    }
+
+    const company = selectedAnalysis.company_name;
+    const jobRole = selectedAnalysis.job_role;
+    const position: AvailablePosition = {
+      id: `analysis-${selectedAnalysis.id}`,
+      company,
+      job_role: jobRole,
+      description: 'DB에 저장된 JD/기업분석 기반 면접',
+      required_skills: [],
+      company_culture: '',
+      doc_ids: [
+        `analysis-${selectedAnalysis.id}`,
+        ...(selectedResume ? [`resume-${selectedResume.id}`] : []),
+      ],
+    };
+
+    const analysisId = selectedAnalysis.id;
+    const resumeId = selectedResume ? selectedResume.id : undefined;
     
     setLoading(true);
     try {
       // Generate questions
       const qRes = await interviewService.getQuestions(
-        pos.company, 
-        pos.job_role,
+        company, 
+        jobRole,
         interviewType,
-        axisType
+        axisType,
+        analysisId,
+        resumeId
       );
       
       const questionsWithAnswer = qRes.questions.map(q => ({ ...q, userAnswer: '' }));
@@ -50,10 +74,12 @@ export default function InterviewHome() {
       // Navigate to detail page with generated data
       navigate(`/interview/new`, {
         state: {
-          position: pos,
+          position,
           axesUsed: qRes.axes_used, // pass the axes used
           questions: questionsWithAnswer,
           featureWeights: qRes.feature_weights,
+          analysisId,
+          resumeId,
           isNew: true
         }
       });
@@ -66,13 +92,19 @@ export default function InterviewHome() {
   };
 
   const handleResumeSession = (session: InterviewSession) => {
-    // For simplicity, reconstruct state from saved session
-    const pos = positions.find(p => p.company === session.company && p.job_role === session.job_role);
-    if (!pos) return;
+    const position: AvailablePosition = {
+      id: session.id,
+      company: session.company,
+      job_role: session.job_role,
+      description: '저장된 면접 세션',
+      required_skills: [],
+      company_culture: '',
+      doc_ids: [],
+    };
     
     navigate(`/interview/${session.id}`, {
       state: {
-        position: pos,
+        position,
         axesUsed: session.axes_used || [],
         questions: session.answers,
         featureWeights: {},
@@ -95,16 +127,34 @@ export default function InterviewHome() {
         {/* Start new */}
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>맞춤형 면접 질문 생성하기</h2>
+          <p className={styles.cardHint}>JD/기업분석은 필수입니다. 평가축은 이 데이터로만 만들고, 자소서는 선택 시 질문 내용에 함께 반영합니다.</p>
           <div className={styles.grid}>
             <div className={styles.inputGroup}>
-              <label>기업/직무 선택</label>
+              <label>JD/기업분석 선택</label>
               <select 
                 className={styles.select}
-                value={selectedPosId}
-                onChange={(e) => setSelectedPosId(e.target.value)}
+                value={selectedAnalysisId}
+                onChange={(e) => setSelectedAnalysisId(e.target.value)}
               >
-                {positions.map(p => (
-                  <option key={p.id} value={p.id}>{p.company} - {p.job_role}</option>
+                <option value="">선택 안 함</option>
+                {analyses.map(item => (
+                  <option key={item.id} value={item.id}>{item.company_name} - {item.job_role}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className={styles.inputGroup}>
+              <label>자소서 선택</label>
+              <select 
+                className={styles.select}
+                value={selectedResumeId}
+                onChange={(e) => setSelectedResumeId(e.target.value)}
+              >
+                <option value="">선택 안 함</option>
+                {resumes.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.company_name && item.job_role ? `${item.company_name} - ${item.job_role}` : item.title}
+                  </option>
                 ))}
               </select>
             </div>
@@ -126,7 +176,7 @@ export default function InterviewHome() {
               <button 
                 className={styles.submitButton}
                 onClick={() => handleStartInterview("static")}
-                disabled={loading || positions.length === 0}
+                disabled={loading || !selectedAnalysisId}
                 style={{ backgroundColor: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
               >
                 {loading ? '생성 중...' : '기존 평가축으로 생성'}
@@ -137,7 +187,7 @@ export default function InterviewHome() {
               <button 
                 className={styles.submitButton}
                 onClick={() => handleStartInterview("dynamic")}
-                disabled={loading || positions.length === 0}
+                disabled={loading || !selectedAnalysisId}
               >
                 {loading ? (
                   <><span className={styles.spin} style={{ marginRight: '8px' }}></span> 생성 중...</>

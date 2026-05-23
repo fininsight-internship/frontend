@@ -14,6 +14,8 @@ export default function InterviewDetail() {
     axesUsed: EvaluationAxis[];
     questions: InterviewQuestion[];
     featureWeights: Record<string, number>;
+    analysisId?: number;
+    resumeId?: number;
     isNew: boolean;
     sessionId?: string;
   } | undefined;
@@ -41,7 +43,7 @@ export default function InterviewDetail() {
     );
   }
 
-  const { position, featureWeights, axesUsed } = state;
+  const { position, featureWeights, axesUsed, analysisId, resumeId } = state;
 
   const activeQuestionIndex = questions.findIndex(q => q.id === activeQuestionId);
   const activeQuestion = questions[activeQuestionIndex];
@@ -56,7 +58,8 @@ export default function InterviewDetail() {
     try {
       const fb = await interviewService.getFeedback(
         position.company, position.job_role,
-        activeQuestion.question, activeQuestion.userAnswer, featureWeights
+        activeQuestion.question, activeQuestion.userAnswer, featureWeights,
+        analysisId, resumeId
       );
       setQuestions(prev => prev.map(item => item.id === activeQuestion.id ? { ...item, feedback: fb } : item));
     } catch {
@@ -72,7 +75,8 @@ export default function InterviewDetail() {
     try {
       const res = await interviewService.getFollowUp(
         position.company, position.job_role,
-        activeQuestion.question, activeQuestion.userAnswer
+        activeQuestion.question, activeQuestion.userAnswer,
+        undefined, analysisId, resumeId
       );
       setQuestions(prev => prev.map(item =>
         item.id === activeQuestion.id ? { ...item, followUps: res.follow_up_questions } : item

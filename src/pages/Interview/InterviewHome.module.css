@@ -55,12 +55,19 @@
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--color-text);
-  margin-bottom: 1rem;
+  margin-bottom: 0.375rem;
+}
+
+.cardHint {
+  margin: 0 0 1rem 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.45;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: minmax(180px, 1.3fr) minmax(180px, 1.3fr) minmax(140px, 0.9fr) minmax(132px, 0.8fr) minmax(132px, 0.8fr);
   gap: 1rem;
 }
 
@@ -311,4 +318,28 @@
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .main {
+    max-width: none;
+  }
+
+  .grid,
+  .sessionTop,
+  .sessionStats {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .statCol {
+    text-align: left;
+  }
 }
