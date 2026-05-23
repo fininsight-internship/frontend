@@ -143,6 +143,88 @@ const DEFAULT_STATE: ExperienceState = {
   ]
 };
 
+const EMPTY_STATE: ExperienceState = {
+  기본정보: {
+    name: '',
+    engName: '',
+    birthDate: '',
+    education: []
+  },
+  자격증상: [],
+  경력인턴: [],
+  교육부트캠프: [],
+  프로젝트: [],
+  동아리: [],
+  봉사활동: [],
+  기타경험: []
+};
+
+const asString = (value: unknown): string => (
+  typeof value === 'string' ? value : value == null ? '' : String(value)
+);
+
+const asArray = <T,>(value: unknown, mapper: (item: any, index: number) => T): T[] => (
+  Array.isArray(value) ? value.map(mapper) : []
+);
+
+const normalizeProfile = (raw: unknown): ExperienceState => {
+  const source = raw && typeof raw === 'object' ? raw as Partial<ExperienceState> : {};
+  const basic = source.기본정보 && typeof source.기본정보 === 'object' ? source.기본정보 : EMPTY_STATE.기본정보;
+
+  return {
+    기본정보: {
+      name: asString(basic.name),
+      engName: asString(basic.engName),
+      birthDate: asString(basic.birthDate),
+      education: asArray(basic.education, (edu) => ({
+        schoolName: asString(edu?.schoolName),
+        admissionDate: asString(edu?.admissionDate),
+        graduationDate: asString(edu?.graduationDate),
+      })),
+    },
+    자격증상: asArray(source.자격증상, (cert, index) => ({
+      id: asString(cert?.id) || `cert-${index}`,
+      name: asString(cert?.name),
+      date: asString(cert?.date),
+      organization: asString(cert?.organization),
+    })),
+    경력인턴: asArray(source.경력인턴, (career, index) => ({
+      id: asString(career?.id) || `career-${index}`,
+      company: asString(career?.company),
+      department: asString(career?.department),
+      startDate: asString(career?.startDate),
+      endDate: asString(career?.endDate),
+      detail: asString(career?.detail),
+    })),
+    교육부트캠프: asArray(source.교육부트캠프, (bootcamp, index) => ({
+      id: asString(bootcamp?.id) || `bootcamp-${index}`,
+      name: asString(bootcamp?.name),
+      topic: asString(bootcamp?.topic),
+      detail: asString(bootcamp?.detail),
+    })),
+    프로젝트: asArray(source.프로젝트, (item, index) => ({
+      id: asString(item?.id) || `project-${index}`,
+      title: asString(item?.title),
+      detail: asString(item?.detail),
+    })),
+    동아리: asArray(source.동아리, (item, index) => ({
+      id: asString(item?.id) || `club-${index}`,
+      title: asString(item?.title),
+      detail: asString(item?.detail),
+    })),
+    봉사활동: asArray(source.봉사활동, (item, index) => ({
+      id: asString(item?.id) || `volunteer-${index}`,
+      title: asString(item?.title),
+      detail: asString(item?.detail),
+    })),
+    기타경험: asArray(source.기타경험, (item, index) => ({
+      id: asString(item?.id) || `other-${index}`,
+      title: asString(item?.title),
+      detail: asString(item?.detail),
+    })),
+  };
+};
+
 // ─── Component: AI Notice Banner ──────────────────────────────────
 function AICoverLetterNotice() {
   return (
