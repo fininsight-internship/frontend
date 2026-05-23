@@ -32,7 +32,8 @@ export default function InterviewDetail() {
   const [loadingFollowUp, setLoadingFollowUp] = useState<Record<string, boolean>>({});
   
 
-  const [showAxes, setShowAxes] = useState(false);
+  const [showAxesModal, setShowAxesModal] = useState(false);
+  const [showQuestionGuide, setShowQuestionGuide] = useState(false);
 
   if (!state) {
     return (
@@ -47,9 +48,18 @@ export default function InterviewDetail() {
 
   const activeQuestionIndex = questions.findIndex(q => q.id === activeQuestionId);
   const activeQuestion = questions[activeQuestionIndex];
+  const activeAxis = axesUsed?.find(ax =>
+    ax.key === activeQuestion?.evaluation_axis ||
+    ax.name === activeQuestion?.axis_name
+  );
 
   const handleAnswerChange = (text: string) => {
     setQuestions(prev => prev.map(q => q.id === activeQuestionId ? { ...q, userAnswer: text } : q));
+  };
+
+  const handleSelectQuestion = (questionId: string) => {
+    setActiveQuestionId(questionId);
+    setShowQuestionGuide(false);
   };
 
   const handleFeedback = async () => {
@@ -175,9 +185,34 @@ export default function InterviewDetail() {
           <div className={styles.topSubtitle}>질문 {answeredCount}/{questions.length} 진행 중</div>
         </div>
         <div className={styles.topActions}>
+          {axesUsed && axesUsed.length > 0 && (
+            <button className={styles.secondaryBtn} onClick={() => setShowAxesModal(true)}>평가기준 보기</button>
+          )}
           <button className={styles.primaryBtn} onClick={handleSave}>전체 저장하기</button>
         </div>
       </div>
+
+      {showAxesModal && (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="axes-modal-title">
+          <div className={styles.modalPanel}>
+            <div className={styles.modalHeader}>
+              <h2 id="axes-modal-title" className={styles.modalTitle}>전체 평가기준</h2>
+              <button className={styles.modalCloseBtn} onClick={() => setShowAxesModal(false)} aria-label="평가기준 닫기">×</button>
+            </div>
+            <div className={styles.modalAxesList}>
+              {axesUsed.map((ax, idx) => (
+                <div key={`${ax.key}-${idx}`} className={styles.modalAxisItem}>
+                  <div className={styles.modalAxisTop}>
+                    <span className={styles.modalAxisName}>{ax.name}</span>
+                    {ax.weight !== undefined && <span className={styles.modalAxisWeight}>{ax.weight}</span>}
+                  </div>
+                  <p className={styles.modalAxisDesc}>{ax.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={styles.contentWrapper}>
         {/* Question nav sidebar */}
@@ -194,7 +229,7 @@ export default function InterviewDetail() {
                 <div 
                   key={q.id} 
                   className={`${styles.qItem} ${isActive ? styles.qItemActive : ''}`}
-                  onClick={() => setActiveQuestionId(q.id)}
+                  onClick={() => handleSelectQuestion(q.id)}
                 >
                   <div className={styles.qItemHeader}>
                     <div className={`${styles.qNum} ${hasAnswer ? styles.qNumDone : isActive ? styles.qNumActive : styles.qNumPending}`}>
@@ -232,31 +267,35 @@ export default function InterviewDetail() {
               <h2 className={styles.qCardQuestion}>
                 {activeQuestion.question}
               </h2>
-              {activeQuestion.tips && (
-                <div className={styles.qCardTip}>
-                  <span>💡 면접관 포인트:</span> {activeQuestion.tips}
-                </div>
-              )}
-              
-              {/* Axes Toggle Viewer */}
-              {axesUsed && axesUsed.length > 0 && (
-                <div className={styles.axesSection}>
-                  <div className={styles.axesTitle}>
-                    핵심 평가축
-                    <button className={styles.axesRevealBtn} onClick={() => setShowAxes(v => !v)}>
-                      {showAxes ? '평가축 숨기기 ▲' : '평가축 보기 ▼'}
-                    </button>
-                  </div>
-                  <div className={showAxes ? styles.axesRevealed : styles.axesBlurred}>
-                    <div className={styles.axesGrid}>
-                      {axesUsed.map((ax, idx) => (
-                        <div key={idx} className={styles.axesCard}>
-                          <div className={styles.axesCardName}>{ax.name}</div>
-                          <div className={styles.axesCardDesc}>{ax.description}</div>
-                        </div>
-                      ))}
+              {(activeQuestion.tips || activeAxis) && (
+                <div className={styles.questionGuide}>
+                  <button className={styles.guideToggleBtn} onClick={() => setShowQuestionGuide(v => !v)}>
+                    <span>평가기준과 면접관 포인트</span>
+                    <span>{showQuestionGuide ? '접기 ▲' : '보기 ▼'}</span>
+                  </button>
+                  {showQuestionGuide && (
+                    <div className={styles.guideContent}>
+                      <div className={styles.guideBlock}>
+                        {activeAxis && (
+                          <>
+                            <div className={styles.guideLabel}>
+                              <span>이 질문의 평가 기준 :</span>
+                              <span className={styles.axisNameBox}>{activeAxis.name}</span>
+                            </div>
+                            {activeAxis.description && (
+                              <p className={styles.guideText}>{activeAxis.description}</p>
+                            )}
+                          </>
+                        )}
+                        {activeQuestion.tips && (
+                          <>
+                            <div className={styles.guideLabel}>면접관 포인트</div>
+                            <p className={styles.guideText}>{activeQuestion.tips}</p>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
@@ -321,30 +360,23 @@ export default function InterviewDetail() {
                   <div className={styles.fbScore}>{(activeQuestion.feedback as AnswerFeedback).overall_score}점</div>
                 </div>
                 
-                <div className={styles.fbGrid}>
-                  <div className={styles.fbGridItem}>
-                    <div className={styles.fbGridLabel}>강점</div>
-                    <ul className={styles.listContainer}>
-                      {((activeQuestion.feedback as AnswerFeedback).strengths || []).map((s, i) => (
-                        <li key={`s-${i}`}>{s}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  
-                  <div className={styles.fbGridItem}>
-                    <div className={styles.fbGridLabel}>보완점 (개선 및 감점 리스크)</div>
-                    <ul className={styles.listContainer}>
-                      {((activeQuestion.feedback as AnswerFeedback).improvement) && (
-                        <li>{(activeQuestion.feedback as AnswerFeedback).improvement}</li>
-                      )}
-                      {((activeQuestion.feedback as AnswerFeedback).risk_points || []).map((rp, i) => (
-                        <li key={`rp-${i}`}>
-                           <span style={{color: '#fb923c'}}>[리스크]</span> {rp.issue} — {rp.reason}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
+                <ul className={styles.feedbackList}>
+                  {((activeQuestion.feedback as AnswerFeedback).strengths || []).map((s, i) => (
+                    <li key={`s-${i}`}>
+                      <span className={styles.goodTag}>[강점]</span> {s}
+                    </li>
+                  ))}
+                  {((activeQuestion.feedback as AnswerFeedback).improvement) && (
+                    <li>
+                      <span className={styles.improveTag}>[보완점]</span> {(activeQuestion.feedback as AnswerFeedback).improvement}
+                    </li>
+                  )}
+                  {((activeQuestion.feedback as AnswerFeedback).risk_points || []).map((rp, i) => (
+                    <li key={`rp-${i}`}>
+                      <span className={styles.riskTag}>[리스크]</span> {rp.issue} — {rp.reason}
+                    </li>
+                  ))}
+                </ul>
                 
                 {((activeQuestion.feedback as AnswerFeedback).follow_up_hint) && (
                   <div className={styles.riskAlert} style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'transparent', marginBottom: 0 }}>
