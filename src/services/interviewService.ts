@@ -30,12 +30,16 @@ export const interviewService = {
   evaluateAxes: async (
     company: string,
     jobRole: string,
+    interviewType: string = "전체",
+    axisType: string = "static",
     analysisId?: number,
     resumeId?: number
   ): Promise<EvaluateAxesResponse> => {
     const { data } = await api.post('/interview/evaluate-axes', {
       company,
       job_role: jobRole,
+      interview_type: interviewType,
+      axis_type: axisType,
       analysis_id: analysisId,
       resume_id: resumeId,
     });
@@ -118,7 +122,8 @@ export const interviewService = {
     userAnswer: string,
     featureWeights?: Record<string, number>,
     analysisId?: number,
-    resumeId?: number
+    resumeId?: number,
+    evaluationAxes?: EvaluationAxis[]
   ): Promise<AnswerFeedback> => {
     const { data } = await api.post('/interview/feedback', {
       company,
@@ -128,6 +133,7 @@ export const interviewService = {
       feature_weights: featureWeights,
       analysis_id: analysisId,
       resume_id: resumeId,
+      evaluation_axes: evaluationAxes,
     });
     return data;
   },
@@ -198,6 +204,14 @@ export const interviewService = {
     questionId: string
   ): Promise<{ message: string }> => {
     const { data } = await api.delete(`/interview/sessions/${sessionId}/questions/${questionId}`);
+    return data;
+  },
+
+  /** 저장된 면접 세션 전체 삭제 */
+  deleteSession: async (
+    sessionId: string
+  ): Promise<{ message: string }> => {
+    const { data } = await api.delete(`/interview/sessions/${sessionId}`);
     return data;
   },
 

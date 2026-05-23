@@ -13,6 +13,7 @@ export default function InterviewHome() {
   const [selectedResumeId, setSelectedResumeId] = useState<string>('');
   const [interviewType, setInterviewType] = useState<string>('인성');
   const [loading, setLoading] = useState(false);
+  const [sessionPendingDelete, setSessionPendingDelete] = useState<InterviewSession | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -118,6 +119,19 @@ export default function InterviewHome() {
     });
   };
 
+  const handleDeleteSession = async () => {
+    if (!sessionPendingDelete) return;
+    const sessionId = sessionPendingDelete.id;
+    try {
+      await interviewService.deleteSession(sessionId);
+      setSessions(prev => prev.filter(item => item.id !== sessionId));
+      setSessionPendingDelete(null);
+    } catch (err) {
+      alert('면접 세션 삭제에 실패했습니다.');
+      console.error(err);
+    }
+  };
+
   return (
     <div className={styles.container}>
       <main className={styles.main}>
@@ -127,6 +141,26 @@ export default function InterviewHome() {
             <p className={styles.subtitle}>JD·자소서 기반 예상 질문으로 면접을 준비하세요</p>
           </div>
         </div>
+
+        {sessionPendingDelete && (
+          <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="delete-session-modal-title">
+            <div className={styles.deleteModalPanel}>
+              <div className={styles.deleteModalHeader}>
+                <h2 id="delete-session-modal-title" className={styles.deleteModalTitle}>면접 이력을 삭제할까요?</h2>
+                <button className={styles.modalCloseBtn} onClick={() => setSessionPendingDelete(null)} aria-label="삭제 확인 닫기">×</button>
+              </div>
+              <div className={styles.deleteModalBody}>
+                <p className={styles.deleteModalText}>
+                  이 면접의 질문, 답변, 피드백, 꼬리질문 기록이 모두 삭제됩니다.
+                </p>
+              </div>
+              <div className={styles.deleteModalFooter}>
+                <button className={styles.cancelBtn} onClick={() => setSessionPendingDelete(null)} type="button">취소</button>
+                <button className={styles.deleteConfirmBtn} onClick={handleDeleteSession} type="button">삭제</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Start new */}
         <div className={styles.card}>
@@ -236,6 +270,9 @@ export default function InterviewHome() {
                     )}
                     <button className={styles.actionButton} onClick={() => handleResumeSession(item)}>
                       {item.stats?.answered_questions === item.stats?.total_questions ? "결과 보기" : "이어 준비"}
+                    </button>
+                    <button className={styles.deleteSessionButton} onClick={() => setSessionPendingDelete(item)} type="button" aria-label="면접 이력 삭제">
+                      삭제
                     </button>
                   </div>
                 </div>

@@ -144,7 +144,8 @@ export default function InterviewDetail() {
       const fb = await interviewService.getFeedback(
         position.company, position.job_role,
         activeQuestion.question, activeQuestion.userAnswer, featureWeights,
-        analysisId, resumeId
+        analysisId, resumeId,
+        activeQuestion.evaluation_axis ? axesUsed.filter(ax => ax.key === activeQuestion.evaluation_axis) : []
       );
       setQuestions(prev => prev.map(item => item.id === activeQuestion.id ? { ...item, feedback: fb } : item));
     } catch {
@@ -272,7 +273,7 @@ export default function InterviewDetail() {
     setSelectedAddAxisKeys(firstAxisKey ? [firstAxisKey] : []);
     setAddQuestionCount(1);
     setManualQuestion('');
-    setManualAxisKey(firstAxisKey);
+    setManualAxisKey('');
     setShowAddQuestionModal(true);
   };
 
@@ -342,8 +343,8 @@ export default function InterviewDetail() {
       question: questionText,
       category: getDefaultCategory(),
       tips: selectedAxis
-        ? `${selectedAxis.name} 관점에서 ${selectedAxis.description} 답변의 근거와 구체성을 확인합니다.`
-        : '직접 추가한 질문입니다. 답변의 구체성, 직무 연관성, 근거의 설득력을 중심으로 확인합니다.',
+        ? `${selectedAxis.name} 관점에서 답변의 근거와 구체성을 확인합니다.`
+        : '직접 추가한 질문입니다. 답변의 구체성, 논리성, 직무 연관성, 자기 이해도를 중심으로 확인합니다.',
       evaluation_axis: selectedAxis?.key,
       axis_name: selectedAxis?.name,
       axis_weight: selectedAxis?.weight,
@@ -497,6 +498,7 @@ export default function InterviewDetail() {
 
                   <section className={styles.addQuestionSection}>
                     <h3 className={styles.addQuestionSectionTitle}>평가 기준 연결</h3>
+                    <p className={styles.addQuestionHint}>평가 기준을 선택하지 않으면 구체성, 논리성, 직무 연관성 등 공통 기준으로 평가됩니다.</p>
                     <div className={styles.axisChoiceGrid}>
                       {axesUsed.map(axis => {
                         const selected = manualAxisKey === axis.key;
@@ -505,7 +507,7 @@ export default function InterviewDetail() {
                             key={axis.key}
                             type="button"
                             className={`${styles.axisChoice} ${selected ? styles.axisChoiceSelected : ''}`}
-                            onClick={() => setManualAxisKey(axis.key)}
+                            onClick={() => setManualAxisKey(selected ? '' : axis.key)}
                           >
                             <span className={styles.axisChoiceName}>{axis.name}</span>
                           </button>
