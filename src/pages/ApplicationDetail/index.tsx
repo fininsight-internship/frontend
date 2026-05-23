@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Plus } from 'lucide-react';
 import { ROUTES } from '../../constants';
+import { useAuthStore } from '../../store/authStore';
+import api from '../../services/api';
 import styles from './ApplicationDetail.module.css';
 
 type Status = 'done' | 'in_progress' | 'waiting';
@@ -41,9 +43,7 @@ interface ResumeQuestion {
   feedbackScore: number | null;
 }
 
-const MOCK_RESUME_QUESTIONS: ResumeQuestion[] = [
-  { id: 1, text: '팀 프로젝트에서 갈등을 해결한 경험을 서술하세요.', status: 'in_progress', feedbackScore: 85 },
-];
+const INITIAL_QUESTIONS: ResumeQuestion[] = [];
 
 const STATUS_TEXT: Record<string, string> = {
   done: '작성 완료',
@@ -55,9 +55,11 @@ export default function ApplicationDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const app = (location.state as { app: Application } | null)?.app;
+  const { user } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState<TabType>('jd');
-  const [questions, setQuestions] = useState<ResumeQuestion[]>(MOCK_RESUME_QUESTIONS);
+  const [questions, setQuestions] = useState<ResumeQuestion[]>(INITIAL_QUESTIONS);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
 
   if (!app) {
     navigate(ROUTES.APPLICATIONS);
@@ -66,13 +68,51 @@ export default function ApplicationDetailPage() {
 
   const report = MOCK_JD_REPORT;
 
-  const handleAddQuestion = () => {
+  // DB에서 자소서 문항/초안 불러오기
+  useEffect(() => {
+    if (!user?.id || !app) return;
+    setLoadingQuestions(true);
+    api.get('/resume/drafts', {
+      params: { user_id: user.id, company_name: app.company, job_title: app.role },
+    }).then((res) => {
+      const dbDrafts: Array<{
+        id: number; question_text: string; draft_content: string; ai_score: number | null;
+      }> = res.data.drafts;
+      setQuestions(
+        dbDrafts.map((d) => ({
+          id: d.id,
+          text: d.question_text,
+          status: d.draft_content?.trim() ? 'in_progress' : 'waiting',
+          feedbackScore: d.ai_score,
+        }))
+      );
+    }).catch(() => {/* 로드 실패 시 빈 목록 유지 */}).finally(() => setLoadingQuestions(false));
+  }, [user?.id, app?.company, app?.role]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAddQuestion = async () => {
     const text = prompt('새 자기소개서 문항을 입력하세요.');
-    if (!text?.trim()) return;
-    setQuestions((prev) => [
-      ...prev,
-      { id: Date.now(), text: text.trim(), status: 'waiting', feedbackScore: null },
-    ]);
+    if (!text?.trim() || !user?.id) return;
+    const trimmed = text.trim();
+    try {
+      const res = await api.post('/resume/drafts/save', {
+        user_id: Number(user.id),
+        company_name: app.company,
+        job_title: app.role,
+        question_text: trimmed,
+        draft_content: '',
+      });
+      const saved = res.data.draft;
+      setQuestions((prev) => [
+        ...prev,
+        { id: saved.id, text: trimmed, status: 'waiting', feedbackScore: null },
+      ]);
+    } catch {
+      // fallback: 로컬에만 추가
+      setQuestions((prev) => [
+        ...prev,
+        { id: Date.now(), text: trimmed, status: 'waiting', feedbackScore: null },
+      ]);
+    }
   };
 
   return (
@@ -194,9 +234,13 @@ export default function ApplicationDetailPage() {
             </button>
           </div>
 
-          {questions.length === 0 ? (
+          {loadingQuestions ? (
             <div className={styles.emptyState}>
-              <p>등록된 문항이 없습니다.</p>
+              <p>문항을 불러오는 중...</p>
+            </div>
+          ) : questions.length === 0 ? (
+            <div className={styles.emptyState}>
+              <p>등록된 문항이 없습니다. 새 문항을 추가해보세요.</p>
             </div>
           ) : (
             <div className={styles.questionList}>

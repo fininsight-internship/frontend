@@ -3,7 +3,7 @@ import { API_BASE_URL } from '../constants';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000, // LLM 생성 속도를 감안한 60초 타임아웃
+  timeout: 120000, // 120 seconds (LLM generation and news/DART scraping can take over 60s)
   headers: {
     'Content-Type': 'application/json',
   },
@@ -25,7 +25,7 @@ api.interceptors.request.use(
           }
         }
       } catch (e) {
-        console.error('Failed to parse user in api request interceptor', e);
+        console.error('Failed to parse user info from localStorage', e);
       }
     }
     return config;

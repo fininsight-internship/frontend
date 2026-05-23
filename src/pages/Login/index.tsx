@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ROUTES } from '../../constants';
 import api from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 import styles from './Login.module.css';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { setAuth, clearAuth } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,7 +25,8 @@ export default function LoginPage() {
 
       console.log('✅ Login Success:', response.data);
       if (response.data?.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        clearAuth();
+        setAuth(response.data.user, '');
       }
 
       navigate(ROUTES.HOME);

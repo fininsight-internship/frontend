@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, CheckCircle, Copy, RefreshCw, Star, Loader2, Plus, Save, FileSearch, X } from 'lucide-react';
 import api from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 import styles from './ResumeEditor.module.css';
 
 interface EditorLocationState {
@@ -75,9 +76,16 @@ export default function ResumeEditorPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const state = (location.state || {}) as EditorLocationState;
-  const autoEvalDone = useRef(false);
   const evalCardRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const { user } = useAuthStore();
+  // user를 ref로도 유지해 stale closure 방지
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+  // React StrictMode 이중 실행 방지
+  const initedRef = useRef(false);
+  // 현재 세션의 resume_id (새 세션: create 후 저장, 기존 세션: DB 로드 후 저장)
+  const resumeIdRef = useRef<number | null>(null);
 
   const {
     companyName = '',
@@ -92,6 +100,7 @@ export default function ResumeEditorPage() {
   const [drafts, setDrafts] = useState<Record<number, string>>(state.drafts || {});
   const [evaluations, setEvaluations] = useState<Record<number, EvaluationResult>>({});
   const [evaluating, setEvaluating] = useState(false);
+  const [evaluatingMap, setEvaluatingMap] = useState<Record<number, boolean>>({});
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
   const [allFeedbackOpen, setAllFeedbackOpen] = useState(false);
@@ -100,43 +109,194 @@ export default function ResumeEditorPage() {
 
   const currentDraft = drafts[currentIdx] || '';
   const currentEval = evaluations[currentIdx];
+  const isCurrentEvaluating = evaluating || !!evaluatingMap[currentIdx];
   const completedCount = questions.filter((_, i) => drafts[i]?.trim()).length;
   const totalProgress = questions.length > 0
     ? Math.round((completedCount / questions.length) * 100)
     : 0;
 
-  // Auto-evaluate the first question when page mounts
-  useEffect(() => {
-    if (autoEvalDone.current) return;
-    const draft = (state.drafts || {})[0];
-    if (!draft?.trim() || !coverQuestions[0]) return;
-    autoEvalDone.current = true;
+  const saveDraftToDB = async (
+    questionText: string, draftContent: string,
+    aiScore?: number, aiFeedback?: string,
+  ) => {
+    const currentUser = userRef.current;
+    if (!currentUser?.id) throw new Error('로그인 정보 없음');
+    const res = await api.post('/resume/drafts/save', {
+      user_id: Number(currentUser.id),
+      company_name: companyName,
+      job_title: jobTitle,
+      question_text: questionText,
+      draft_content: draftContent,
+      ai_score: aiScore ?? null,
+      ai_feedback: aiFeedback ?? null,
+      resume_id: resumeIdRef.current,
+    });
+    return res.data as { status: string; draft: { id: number; draft_content: string; ai_score: number | null; ai_feedback: string; updated_at: string } };
+  };
 
-    const run = async () => {
-      setEvaluating(true);
-      try {
-        const res = await api.post('/resume/evaluate-detailed', {
-          draft,
-          company_name: companyName,
-          job_title: jobTitle,
-          cover_question: questions[0],
-          selections,
-          company_insights: companyInsights,
+  const triggerAutoEvaluate = async (idx: number, draftText: string, qText: string) => {
+    if (!draftText.trim()) return;
+    setEvaluatingMap((prev) => ({ ...prev, [idx]: true }));
+    try {
+      const res = await api.post('/resume/evaluate-detailed', {
+        draft: draftText,
+        company_name: companyName,
+        job_title: jobTitle,
+        cover_question: qText,
+        selections,
+        company_insights: companyInsights,
+      });
+      const evalResult = { evaluation: res.data.evaluation, total_score: res.data.total_score };
+      setEvaluations((prev) => ({ ...prev, [idx]: evalResult }));
+      
+      // 평가 결과를 DB에 저장
+      await saveDraftToDB(
+        qText, draftText,
+        evalResult.total_score, evalResult.evaluation
+      );
+    } catch (e) {
+      console.error(`[Auto Evaluation Failed for Q${idx + 1}]`, e);
+    } finally {
+      setEvaluatingMap((prev) => ({ ...prev, [idx]: false }));
+    }
+  };
+
+  // 진입 시 초안 저장 → 병렬 평가 순서로 처리
+  useEffect(() => {
+    if (initedRef.current) return;
+    initedRef.current = true;
+
+    const currentUser = userRef.current;
+    console.log('[ResumeEditor] init — user:', currentUser?.id, 'company:', companyName, 'job:', jobTitle);
+    console.log('[ResumeEditor] state.drafts:', state.drafts);
+    if (!currentUser?.id || !companyName || !jobTitle) {
+      console.warn('[ResumeEditor] 초기화 중단: user/company/job 누락');
+      return;
+    }
+
+    const hasStateDrafts = Object.values(state.drafts || {}).some(
+      (d) => typeof d === 'string' && d.trim(),
+    );
+    console.log('[ResumeEditor] hasStateDrafts:', hasStateDrafts);
+
+    const initEditor = async () => {
+      if (hasStateDrafts) {
+        // 새 세션 (wizard에서 전달된 초안): 새 resume 생성 → 순차 저장 → 병렬 평가
+        const activeQuestions = coverQuestions.length > 0 ? coverQuestions : [''];
+        const activeDrafts = state.drafts || {};
+
+        // 0단계: 새 resume 행 생성
+        try {
+          const createRes = await api.post('/resume/create', {
+            user_id: Number(currentUser.id),
+            company_name: companyName,
+            job_title: jobTitle,
+          });
+          resumeIdRef.current = createRes.data.resume_id;
+          console.log(`[initEditor] 새 resume 생성: id=${resumeIdRef.current}`);
+        } catch (e) {
+          console.error('[initEditor] resume 생성 실패:', e);
+          return;
+        }
+
+        // 1단계: 모든 초안 순차 저장 (race condition 방지)
+        for (let idx = 0; idx < activeQuestions.length; idx++) {
+          const draftText = activeDrafts[idx] || '';
+          if (draftText.trim()) {
+            try {
+              await saveDraftToDB(activeQuestions[idx], draftText);
+              console.log(`[initEditor] Q${idx + 1} 저장 완료`);
+            } catch (e) {
+              console.error(`[initEditor] Q${idx + 1} 저장 실패:`, e);
+            }
+          }
+        }
+
+        // 2단계: 항목별 병렬 평가 (각 완료 시 triggerAutoEvaluate 내부에서 DB 저장)
+        activeQuestions.forEach((qText, idx) => {
+          const draftText = activeDrafts[idx] || '';
+          if (draftText.trim()) triggerAutoEvaluate(idx, draftText, qText);
         });
-        setEvaluations({ 0: { evaluation: res.data.evaluation, total_score: res.data.total_score } });
-      } catch {
-        // fail silently — user can retry manually
-      } finally {
-        setEvaluating(false);
+      } else {
+        // 기존 세션: DB에서 최신 초안 로드 → resume_id 저장 → 평가 없는 항목 병렬 평가
+        try {
+          const res = await api.get('/resume/drafts', {
+            params: { user_id: currentUser.id, company_name: companyName, job_title: jobTitle },
+          });
+          resumeIdRef.current = res.data.resume_id ?? null;
+
+          const dbDrafts: Array<{
+            id: number; question_text: string; draft_content: string;
+            ai_score: number | null; ai_feedback: string;
+          }> = res.data.drafts || [];
+
+          const newQuestions: string[] = [];
+          const newDrafts: Record<number, string> = {};
+          const newEvals: Record<number, EvaluationResult> = {};
+
+          dbDrafts.forEach((d, i) => {
+            newQuestions.push(d.question_text);
+            newDrafts[i] = d.draft_content;
+            if (d.ai_score !== null && d.ai_feedback) {
+              newEvals[i] = { evaluation: d.ai_feedback, total_score: d.ai_score };
+            }
+          });
+
+          if (dbDrafts.length > 0) {
+            setQuestions(newQuestions);
+            setDrafts(newDrafts);
+          }
+          setEvaluations(newEvals);
+
+          newQuestions.forEach((qText, idx) => {
+            const draftText = newDrafts[idx] || '';
+            if (draftText.trim() && !newEvals[idx]) {
+              triggerAutoEvaluate(idx, draftText, qText);
+            }
+          });
+        } catch (_) {}
       }
     };
-    run();
+
+    initEditor();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+
+
+  const handleRefine = async () => {
+    if (!currentDraft.trim() || evaluating) return;
+    if (!currentEval) {
+      alert('먼저 "저장 및 피드백" 버튼을 눌러 평가를 받은 후 재작성할 수 있습니다.');
+      return;
+    }
+    setEvaluating(true);
+    try {
+      const res = await api.post('/resume/refine', {
+        draft: currentDraft,
+        evaluation: currentEval.evaluation,
+        user_answers: '',
+        context: { jd_analysis: companyInsights },
+      });
+      const refined: string = res.data.refined_draft || '';
+      if (refined.trim()) {
+        setDrafts((prev) => ({ ...prev, [currentIdx]: refined }));
+        await saveDraftToDB(questions[currentIdx], refined);
+      }
+    } catch {
+      alert('재작성 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setEvaluating(false);
+    }
+  };
 
   const handleEvaluate = async () => {
     if (!currentDraft.trim() || evaluating) return;
     setEvaluating(true);
     try {
+      // 1단계: 초안 먼저 저장 (평가 실패해도 내용은 보존)
+      await saveDraftToDB(questions[currentIdx], currentDraft);
+
+      // 2단계: 평가 실행
       const res = await api.post('/resume/evaluate-detailed', {
         draft: currentDraft,
         company_name: companyName,
@@ -145,12 +305,16 @@ export default function ResumeEditorPage() {
         selections,
         company_insights: companyInsights,
       });
-      setEvaluations((prev) => ({
-        ...prev,
-        [currentIdx]: { evaluation: res.data.evaluation, total_score: res.data.total_score },
-      }));
-    } catch {
-      // fail silently
+      const evalResult = { evaluation: res.data.evaluation, total_score: res.data.total_score };
+      setEvaluations((prev) => ({ ...prev, [currentIdx]: evalResult }));
+
+      // 3단계: 평가 결과와 함께 다시 저장 → resume_question_evaluations
+      await saveDraftToDB(
+        questions[currentIdx], currentDraft,
+        evalResult.total_score, evalResult.evaluation,
+      );
+    } catch (e) {
+      console.error('[저장 및 피드백 오류]', e);
     } finally {
       setEvaluating(false);
     }
@@ -169,10 +333,22 @@ export default function ResumeEditorPage() {
     setQuestions((prev) => [...prev, text.trim()]);
   };
 
-  const handleSaveAll = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    // TODO: DB 연동 시 실제 저장 API 호출
+  const handleSaveAll = async () => {
+    if (!user?.id) {
+      alert('로그인이 필요합니다. 다시 로그인해주세요.');
+      return;
+    }
+    try {
+      // 순차 저장으로 resume 중복 생성 방지
+      for (let i = 0; i < questions.length; i++) {
+        await saveDraftToDB(questions[i], drafts[i] || '');
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      console.error('저장 실패:', e);
+      alert('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
   };
 
   const handleAllFeedback = async () => {
@@ -180,6 +356,12 @@ export default function ResumeEditorPage() {
     setAllFeedbackResult(null);
     setAllFeedbackLoading(true);
     try {
+      // 전체 피드백 전에 모든 현재 초안 순차 저장 (동시 저장 시 resume 중복 생성 방지)
+      if (user?.id) {
+        for (let i = 0; i < questions.length; i++) {
+          await saveDraftToDB(questions[i], drafts[i] || '');
+        }
+      }
       const res = await api.post('/resume/evaluate-all', {
         company_name: companyName,
         job_title: jobTitle,
@@ -187,6 +369,16 @@ export default function ResumeEditorPage() {
         drafts: questions.map((_, i) => drafts[i] || ''),
       });
       setAllFeedbackResult(res.data.feedback);
+      // 전체 피드백 결과를 resume_evaluations 테이블에 저장
+      if (user?.id && res.data.feedback) {
+        api.post('/resume/evaluations/save', {
+          user_id: Number(user.id),
+          company_name: companyName,
+          job_title: jobTitle,
+          overall_feedback: res.data.feedback,
+          resume_id: resumeIdRef.current,
+        }).catch(() => {});
+      }
     } catch {
       setAllFeedbackResult('피드백 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
@@ -287,7 +479,12 @@ export default function ResumeEditorPage() {
             />
 
             <div className={styles.actionBar}>
-              <button className={styles.regenerateBtn} disabled>
+              <button
+                className={styles.regenerateBtn}
+                onClick={handleRefine}
+                disabled={!currentDraft.trim() || isCurrentEvaluating || !currentEval}
+                title={!currentEval ? '먼저 피드백을 받은 후 재작성할 수 있습니다' : 'AI가 평가 피드백을 반영해 다시 작성합니다'}
+              >
                 <RefreshCw size={14} /> AI 초안 재생성
               </button>
               <button className={`${styles.copyBtn} ${copied ? styles.copyBtnDone : ''}`} onClick={handleCopy}>
@@ -297,9 +494,9 @@ export default function ResumeEditorPage() {
               <button
                 className={styles.evaluateBtn}
                 onClick={handleEvaluate}
-                disabled={!currentDraft.trim() || evaluating}
+                disabled={!currentDraft.trim() || isCurrentEvaluating}
               >
-                {evaluating
+                {isCurrentEvaluating
                   ? <Loader2 size={14} className={styles.spinner} />
                   : <Star size={14} />}
                 저장 및 피드백
@@ -308,12 +505,12 @@ export default function ResumeEditorPage() {
           </div>
 
           {/* Evaluation card — loading (first time) or result with overlay (re-evaluate) */}
-          {(evaluating || currentEval) && (
-            <div ref={evalCardRef} className={`${styles.evalCard} ${evaluating ? styles.evalCardLoading : ''}`}>
+          {(isCurrentEvaluating || currentEval) && (
+            <div ref={evalCardRef} className={`${styles.evalCard} ${isCurrentEvaluating ? styles.evalCardLoading : ''}`}>
               {/* Blur overlay shown while evaluating */}
-              {evaluating && (
+              {isCurrentEvaluating && (
                 <div className={styles.evalOverlay}>
-                  <Loader2 size={28} className={styles.spinner} color="var(--color-primary)" />
+                   <Loader2 size={28} className={styles.spinner} color="var(--color-primary)" />
                   <p className={styles.evalOverlayText}>면접왕 이형이 자소서를 분석하고 있어요...</p>
                 </div>
               )}
