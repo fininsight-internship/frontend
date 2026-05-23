@@ -1,7 +1,8 @@
 import { useState, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Bar, BarChart, CartesianGrid, Line, LineChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { interviewService } from '../../services/interviewService';
-import type { AvailablePosition, EvaluationAxis, InterviewQuestion, AnswerFeedback, FollowUpQuestion } from '../../types';
+import type { AvailablePosition, EvaluationAxis, InterviewQuestion, AnswerFeedback, FollowUpQuestion, OverallInterviewReport } from '../../types';
 import styles from './InterviewDetail.module.css';
 import { ROUTES } from '../../constants';
 
@@ -10,6 +11,12 @@ type PendingDeleteQuestion = {
   question: InterviewQuestion;
   index: number;
 };
+
+const getFeedbackLogs = (question: InterviewQuestion) => (
+  question.feedbackLogs?.length
+    ? question.feedbackLogs
+    : ((question.feedback as AnswerFeedback & { feedback_logs?: InterviewQuestion['feedbackLogs'] })?.feedback_logs || [])
+);
 
 export default function InterviewDetail() {
   const location = useLocation();
@@ -26,6 +33,7 @@ export default function InterviewDetail() {
     axisType?: string;
     isNew: boolean;
     sessionId?: string;
+    overallReport?: OverallInterviewReport;
   } | undefined;
 
   const [questions, setQuestions] = useState<InterviewQuestion[]>(
@@ -50,6 +58,10 @@ export default function InterviewDetail() {
   const [manualAxisKey, setManualAxisKey] = useState('');
   const [loadingAddQuestions, setLoadingAddQuestions] = useState(false);
   const [questionPendingDelete, setQuestionPendingDelete] = useState<PendingDeleteQuestion | null>(null);
+  const [showSaveReportPrompt, setShowSaveReportPrompt] = useState(false);
+  const [showOverallReportModal, setShowOverallReportModal] = useState(false);
+  const [loadingOverallReport, setLoadingOverallReport] = useState(false);
+  const [overallReport, setOverallReport] = useState<OverallInterviewReport | undefined>(state?.overallReport);
 
   if (!state) {
     return (
@@ -147,7 +159,22 @@ export default function InterviewDetail() {
         analysisId, resumeId,
         activeQuestion.evaluation_axis ? axesUsed.filter(ax => ax.key === activeQuestion.evaluation_axis) : []
       );
-      setQuestions(prev => prev.map(item => item.id === activeQuestion.id ? { ...item, feedback: fb } : item));
+      setQuestions(prev => prev.map(item => {
+        if (item.id !== activeQuestion.id) return item;
+        const feedbackLog = {
+          score: fb.overall_score,
+          answer: activeQuestion.userAnswer || '',
+          strengths: fb.strengths || [],
+          improvement: fb.improvement || '',
+          risk_points: fb.risk_points || [],
+          created_at: new Date().toISOString(),
+        };
+        return {
+          ...item,
+          feedback: fb,
+          feedbackLogs: [...(item.feedbackLogs || []), feedbackLog],
+        };
+      }));
     } catch {
       alert('피드백 요청에 실패했습니다.');
     } finally {
@@ -254,14 +281,51 @@ export default function InterviewDetail() {
     }
   };
 
-  const handleSave = async () => {
+  const saveSession = async (report?: OverallInterviewReport) => {
     try {
-      await interviewService.saveSession(position.company, position.job_role, questions, state.sessionId, axesUsed, effectiveInterviewType, axisType);
+      await interviewService.saveSession(position.company, position.job_role, questions, state.sessionId, axesUsed, effectiveInterviewType, axisType, report);
       alert('저장되었습니다! 면접 목록으로 이동합니다.');
       navigate(ROUTES.INTERVIEW);
     } catch {
       alert('저장에 실패했습니다.');
     }
+  };
+
+  const handleSave = () => {
+    setShowSaveReportPrompt(true);
+  };
+
+  const handleSaveWithoutReport = () => {
+    setShowSaveReportPrompt(false);
+    const reportToSave = overallReport ? { ...overallReport, is_outdated: true } : undefined;
+    if (reportToSave) setOverallReport(reportToSave);
+    saveSession(reportToSave);
+  };
+
+  const handleGenerateOverallReport = async () => {
+    setLoadingOverallReport(true);
+    try {
+      const report = await interviewService.getOverallReport(
+        position.company,
+        position.job_role,
+        effectiveInterviewType,
+        questions,
+        axesUsed,
+        analysisId,
+        resumeId
+      );
+      setOverallReport({ ...report, is_outdated: false });
+      setShowSaveReportPrompt(false);
+      setShowOverallReportModal(true);
+    } catch {
+      alert('전체 면접 리포트 생성에 실패했습니다.');
+    } finally {
+      setLoadingOverallReport(false);
+    }
+  };
+
+  const handleSaveWithReport = () => {
+    saveSession(overallReport ? { ...overallReport, is_outdated: false } : undefined);
   };
 
   const categoryLabel = (c: string) => {
@@ -383,6 +447,35 @@ export default function InterviewDetail() {
 
   const answeredCount = questions.filter(q => (q.userAnswer || '').trim().length > 0).length;
   const minimumQuestionCount = Math.max(1, selectedAddAxisKeys.length);
+  const dimensionChartData = overallReport
+    ? Object.entries(overallReport.dimension_scores || {}).map(([name, score]) => ({ name, score }))
+    : [];
+  const questionScoreData = overallReport?.question_reviews?.map((item, idx) => ({
+    name: `Q${idx + 1}`,
+    score: item.score ?? 0,
+  })) || [];
+  const feedbackMaxRound = Math.max(0, ...questions.map(question => getFeedbackLogs(question).length));
+  const averageFeedbackTrendData = Array.from({ length: feedbackMaxRound }, (_, roundIdx) => {
+    const scores = questions
+      .map(question => getFeedbackLogs(question)[roundIdx]?.score)
+      .filter((score): score is number => typeof score === 'number');
+    return {
+      name: `${roundIdx + 1}회`,
+      average: scores.length ? Number((scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)) : undefined,
+    };
+  });
+  const answerFeedbackLineKeys = questions
+    .map((question, idx) => ({ key: `Q${idx + 1}`, hasLogs: Boolean(getFeedbackLogs(question).length) }))
+    .filter(item => item.hasLogs)
+    .map(item => item.key);
+  const answerFeedbackTrendData = Array.from({ length: feedbackMaxRound }, (_, roundIdx) => {
+    const row: Record<string, string | number | undefined> = { name: `${roundIdx + 1}회` };
+    questions.forEach((question, idx) => {
+      row[`Q${idx + 1}`] = getFeedbackLogs(question)[roundIdx]?.score;
+    });
+    return row;
+  });
+  const answerLineColors = ['#2563eb', '#14b8a6', '#f97316', '#8b5cf6', '#ef4444', '#0ea5e9', '#84cc16', '#f59e0b'];
 
   return (
     <div className={styles.container}>
@@ -402,6 +495,231 @@ export default function InterviewDetail() {
           <button className={styles.primaryBtn} onClick={handleSave}>전체 저장하기</button>
         </div>
       </div>
+
+      {showSaveReportPrompt && (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="save-report-modal-title">
+          <div className={styles.deleteModalPanel}>
+            <div className={styles.deleteModalHeader}>
+              <h2 id="save-report-modal-title" className={styles.deleteModalTitle}>
+                {overallReport ? '종합 리포트를 업데이트할까요?' : '전체 면접 피드백을 받을까요?'}
+              </h2>
+              <button className={styles.modalCloseBtn} onClick={() => setShowSaveReportPrompt(false)} aria-label="저장 확인 닫기">×</button>
+            </div>
+            <div className={styles.deleteModalBody}>
+              <p className={styles.deleteModalText}>
+                {overallReport
+                  ? '업데이트 없이 저장하면 기존 리포트는 이전 답변과 피드백 기준으로 남습니다. 리포트 보기에서 최신 내용이 반영되지 않았다고 표시됩니다.'
+                  : '현재 답변과 질문별 피드백을 바탕으로 면접왕 이형 스타일의 종합 평가 리포트를 생성할 수 있습니다.'}
+              </p>
+            </div>
+            <div className={styles.deleteModalFooter}>
+              <button className={styles.secondaryBtn} onClick={handleSaveWithoutReport} type="button" disabled={loadingOverallReport}>
+                {overallReport ? '아니오, 저장만' : '아니오, 그냥 저장'}
+              </button>
+              <button className={styles.primaryBtn} onClick={handleGenerateOverallReport} type="button" disabled={loadingOverallReport}>
+                {loadingOverallReport
+                  ? (overallReport ? '업데이트 중...' : '리포트 생성 중...')
+                  : (overallReport ? '예, 업데이트하기' : '예, 리포트 받기')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showOverallReportModal && overallReport && (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="overall-report-modal-title">
+          <div className={styles.reportModalPanel}>
+            <div className={styles.modalHeader}>
+              <div>
+                <h2 id="overall-report-modal-title" className={styles.modalTitle}>전체 면접 평가 리포트</h2>
+                <p className={styles.reportSubtitle}>{position.company} · {position.job_role}</p>
+              </div>
+              <button className={styles.modalCloseBtn} onClick={() => setShowOverallReportModal(false)} aria-label="리포트 닫기">×</button>
+            </div>
+
+            <div className={styles.reportBody}>
+              {overallReport.is_outdated && (
+                <div className={styles.reportStaleNotice}>
+                  <div>
+                    <strong>이 리포트는 최신 저장 내용이 반영되지 않았습니다.</strong>
+                    <p>업데이트 없이 저장해서 이전 답변과 피드백 기준의 리포트가 표시되고 있습니다.</p>
+                  </div>
+                  <button className={styles.primaryBtn} onClick={handleGenerateOverallReport} type="button" disabled={loadingOverallReport}>
+                    {loadingOverallReport ? '업데이트 중...' : '리포트 업데이트'}
+                  </button>
+                </div>
+              )}
+
+              <section className={styles.reportHero}>
+                <div className={styles.reportScoreBox}>
+                  <div className={styles.reportScore}>{overallReport.overall_score}</div>
+                  <div className={styles.reportScoreLabel}>{overallReport.readiness_label}</div>
+                </div>
+                <div className={styles.reportSummary}>
+                  <div className={styles.reportSectionLabel}>면접관 한줄평</div>
+                  <p>{overallReport.interviewer_one_liner}</p>
+                  <div className={styles.reportSectionLabel}>코치 총평</div>
+                  <p>{overallReport.coach_summary}</p>
+                </div>
+              </section>
+
+              <section className={styles.reportGrid}>
+                <div className={styles.reportChartCard}>
+                  <h3>역량 분포</h3>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <RadarChart data={dimensionChartData}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+                      <Radar dataKey="score" stroke="#2563eb" fill="#2563eb" fillOpacity={0.28} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className={styles.reportChartCard}>
+                  <h3>질문별 점수 (5점 만점)</h3>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={questionScoreData}>
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis domain={[0, 5]} tick={{ fontSize: 11 }} />
+                      <Bar dataKey="score" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+
+              {(averageFeedbackTrendData.length > 0 || answerFeedbackLineKeys.length > 0) && (
+                <section className={styles.reportSection}>
+                  <h3>답변 완성도 변화</h3>
+                  <div className={styles.reportGrid}>
+                    {averageFeedbackTrendData.length > 0 && (
+                      <div className={styles.reportChartCard}>
+                        <h3>전체 답변 평균 점수 변화</h3>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <LineChart data={averageFeedbackTrendData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                            <YAxis domain={[0, 5]} tick={{ fontSize: 11 }} />
+                            <Tooltip formatter={(value) => [`${value}점`, '평균']} />
+                            <Line type="monotone" dataKey="average" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                    {answerFeedbackLineKeys.length > 0 && (
+                      <div className={styles.reportChartCard}>
+                        <h3>답변별 점수 변화</h3>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <LineChart data={answerFeedbackTrendData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                            <YAxis domain={[0, 5]} tick={{ fontSize: 11 }} />
+                            <Tooltip formatter={(value, name) => [`${value}점`, name]} />
+                            {answerFeedbackLineKeys.map((key, idx) => (
+                              <Line
+                                key={key}
+                                type="monotone"
+                                dataKey={key}
+                                stroke={answerLineColors[idx % answerLineColors.length]}
+                                strokeWidth={2}
+                                dot={{ r: 3 }}
+                                connectNulls
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </div>
+                  {averageFeedbackTrendData.length < 2 && (
+                    <p className={styles.reportMutedText}>같은 질문이나 여러 답변에 대해 피드백 로그가 더 쌓이면 변화 추이가 더 선명하게 표시됩니다.</p>
+                  )}
+                </section>
+              )}
+
+              <section className={styles.reportColumns}>
+                <div>
+                  <h3>강점 TOP 3</h3>
+                  {(overallReport.strengths || []).map((item, idx) => (
+                    <div className={styles.reportListItem} key={`strength-${idx}`}>
+                      <strong>{item.title}</strong>
+                      <p>{item.evidence}</p>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <h3>감점 리스크 TOP 3</h3>
+                  {(overallReport.risks || []).map((item, idx) => (
+                    <div className={styles.reportListItem} key={`risk-${idx}`}>
+                      <strong>{item.title}</strong>
+                      <p>{item.reason}</p>
+                      <span>{item.fix}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {overallReport.answer_growth && (
+                <section className={styles.reportSection}>
+                  <h3>답변 향상 추이</h3>
+                  <div className={styles.reportGrowthBox}>
+                    <p>{overallReport.answer_growth.summary}</p>
+                    <span>{overallReport.answer_growth.score_trend}</span>
+                  </div>
+                  <div className={styles.reportColumns}>
+                    <div>
+                      <h3>좋아지고 있는 부분</h3>
+                      {(overallReport.answer_growth.improved_points || []).map((item, idx) => (
+                        <div className={styles.reportListItem} key={`growth-good-${idx}`}>
+                          <p>{item}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <h3>아직 남은 보완점</h3>
+                      {(overallReport.answer_growth.remaining_gaps || []).map((item, idx) => (
+                        <div className={styles.reportListItem} key={`growth-gap-${idx}`}>
+                          <p>{item}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              <section className={styles.reportSection}>
+                <h3>다음 연습 우선순위</h3>
+                {(overallReport.next_actions || []).map((item, idx) => (
+                  <div className={styles.reportActionItem} key={`action-${idx}`}>
+                    <span>{idx + 1}</span>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <p>{item.detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </section>
+
+              <section className={styles.reportSection}>
+                <h3>질문별 요약 피드백</h3>
+                {(overallReport.question_reviews || []).map((item, idx) => (
+                  <div className={styles.reportQuestionItem} key={`q-review-${idx}`}>
+                    <div>
+                      <strong>Q{idx + 1}. {item.question}</strong>
+                      <p>{item.summary}</p>
+                    </div>
+                    <span>{item.score === null ? '미평가' : `${item.score}/5점`} · {item.priority}</span>
+                  </div>
+                ))}
+              </section>
+            </div>
+
+            <div className={styles.reportFooter}>
+              <button className={styles.secondaryBtn} onClick={() => setShowOverallReportModal(false)} type="button">닫기</button>
+              <button className={styles.primaryBtn} onClick={handleSaveWithReport} type="button">리포트와 함께 저장</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAxesModal && (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="axes-modal-title">

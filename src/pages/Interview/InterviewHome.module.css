@@ -299,6 +299,21 @@
   background-color: var(--color-border-light);
 }
 
+.reportButton {
+  background-color: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: var(--color-primary);
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reportButton:hover {
+  background-color: rgba(37, 99, 235, 0.14);
+}
+
 .deleteSessionButton {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -334,6 +349,18 @@
   border: 1px solid var(--color-border);
   border-radius: 1rem;
   box-shadow: var(--shadow-lg, 0 20px 45px rgba(15, 23, 42, 0.2));
+}
+
+.reportModalPanel {
+  width: min(980px, calc(100vw - 2rem));
+  max-height: min(88vh, 900px);
+  overflow: hidden;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-lg, 0 20px 45px rgba(15, 23, 42, 0.2));
+  display: flex;
+  flex-direction: column;
 }
 
 .deleteModalHeader {
@@ -384,6 +411,222 @@
   gap: 0.75rem;
   padding: 1rem 1.25rem 1.25rem;
   border-top: 1px solid var(--color-border);
+}
+
+.reportSubtitle {
+  margin: 0.25rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.reportBody {
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.reportStaleNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  background-color: #fffbeb;
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+}
+
+.reportStaleNotice strong {
+  color: #92400e;
+  font-size: 0.86rem;
+}
+
+.reportStaleNotice p {
+  margin: 0.25rem 0 0;
+  color: #a16207;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.reportStaleNotice .submitButton {
+  width: auto;
+  height: auto;
+  min-height: 2.25rem;
+  white-space: nowrap;
+}
+
+.reportHero {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 1rem;
+}
+
+.reportScoreBox {
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  background: #eff6ff;
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.reportScore {
+  font-size: 3rem;
+  font-weight: 800;
+  color: #1d4ed8;
+  line-height: 1;
+}
+
+.reportScoreLabel {
+  margin-top: 0.5rem;
+  color: #1e40af;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.reportSummary,
+.reportChartCard,
+.reportSection,
+.reportColumns > div {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1rem;
+  background-color: var(--color-surface);
+}
+
+.reportSummary p {
+  margin: 0.25rem 0 0.75rem;
+  color: var(--color-text);
+  line-height: 1.6;
+  font-size: 0.9rem;
+}
+
+.reportSummary p:last-child {
+  margin-bottom: 0;
+}
+
+.reportSectionLabel {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.reportGrid,
+.reportColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.reportChartCard h3,
+.reportSection h3,
+.reportColumns h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.reportListItem,
+.reportActionItem,
+.reportQuestionItem {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.reportListItem:first-of-type,
+.reportActionItem:first-of-type,
+.reportQuestionItem:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.reportListItem strong,
+.reportActionItem strong,
+.reportQuestionItem strong {
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+.reportListItem p,
+.reportActionItem p,
+.reportQuestionItem p {
+  margin: 0.25rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.reportListItem span {
+  display: block;
+  margin-top: 0.35rem;
+  color: #2563eb;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.reportGrowthBox {
+  border: 1px solid rgba(20, 184, 166, 0.24);
+  background-color: rgba(20, 184, 166, 0.08);
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+  margin-bottom: 0.875rem;
+}
+
+.reportGrowthBox p {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.reportGrowthBox span {
+  display: block;
+  margin-top: 0.45rem;
+  color: #0f766e;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.reportMutedText {
+  margin: 0.75rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.reportActionItem {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.reportActionItem > span {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background-color: #2563eb;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.reportQuestionItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.reportQuestionItem > span {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .cancelBtn,
@@ -474,6 +717,18 @@
   .sessionTop,
   .sessionStats {
     grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reportHero,
+  .reportGrid,
+  .reportColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .reportQuestionItem,
+  .reportStaleNotice {
     flex-direction: column;
     align-items: stretch;
   }

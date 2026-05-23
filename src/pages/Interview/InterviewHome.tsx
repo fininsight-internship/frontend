@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bar, BarChart, CartesianGrid, Line, LineChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { interviewService } from '../../services/interviewService';
-import type { AvailablePosition, InterviewAnalysisSource, InterviewResumeSource, InterviewSession } from '../../types';
+import type { AvailablePosition, InterviewAnalysisSource, InterviewResumeSource, InterviewSession, OverallInterviewReport } from '../../types';
 import styles from './InterviewHome.module.css';
+
+const getFeedbackLogs = (question: InterviewSession['answers'][number]) => (
+  question.feedbackLogs?.length
+    ? question.feedbackLogs
+    : ((question.feedback as NonNullable<typeof question.feedback> & { feedback_logs?: typeof question.feedbackLogs })?.feedback_logs || [])
+);
 
 export default function InterviewHome() {
   const navigate = useNavigate();
@@ -14,6 +21,8 @@ export default function InterviewHome() {
   const [interviewType, setInterviewType] = useState<string>('인성');
   const [loading, setLoading] = useState(false);
   const [sessionPendingDelete, setSessionPendingDelete] = useState<InterviewSession | null>(null);
+  const [reportSession, setReportSession] = useState<InterviewSession | null>(null);
+  const [loadingReportSessionId, setLoadingReportSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -114,7 +123,8 @@ export default function InterviewHome() {
         interviewType: session.interview_type || '전체',
         axisType: session.axis_type || 'dynamic',
         isNew: false,
-        sessionId: session.id
+        sessionId: session.id,
+        overallReport: session.overall_report || session.stats?.overall_report
       }
     });
   };
@@ -145,6 +155,88 @@ export default function InterviewHome() {
     return '혼합';
   };
 
+  const getSessionReport = (session: InterviewSession | null): OverallInterviewReport | undefined => (
+    session?.overall_report || session?.stats?.overall_report
+  );
+
+  const handleUpdateSessionReport = async (session: InterviewSession) => {
+    setLoadingReportSessionId(session.id);
+    try {
+      const report = await interviewService.getOverallReport(
+        session.company,
+        session.job_role,
+        getSessionInterviewType(session),
+        session.answers,
+        session.axes_used || []
+      );
+      const updatedReport = { ...report, is_outdated: false };
+      await interviewService.saveSession(
+        session.company,
+        session.job_role,
+        session.answers,
+        session.id,
+        session.axes_used || [],
+        session.interview_type || getSessionInterviewType(session),
+        session.axis_type || 'dynamic',
+        updatedReport
+      );
+      setSessions(prev => prev.map(item => (
+        item.id === session.id
+          ? {
+              ...item,
+              overall_report: updatedReport,
+              stats: item.stats ? { ...item.stats, overall_report: updatedReport } : item.stats,
+            }
+          : item
+      )));
+      setReportSession(prev => prev && prev.id === session.id
+        ? {
+            ...prev,
+            overall_report: updatedReport,
+            stats: prev.stats ? { ...prev.stats, overall_report: updatedReport } : prev.stats,
+          }
+        : prev
+      );
+    } catch (err) {
+      alert('종합 리포트 업데이트에 실패했습니다.');
+      console.error(err);
+    } finally {
+      setLoadingReportSessionId(null);
+    }
+  };
+
+  const activeReport = getSessionReport(reportSession);
+  const dimensionChartData = activeReport
+    ? Object.entries(activeReport.dimension_scores || {}).map(([name, score]) => ({ name, score }))
+    : [];
+  const questionScoreData = activeReport?.question_reviews?.map((item, idx) => ({
+    name: `Q${idx + 1}`,
+    score: item.score ?? 0,
+  })) || [];
+  const reportAnswers = reportSession?.answers || [];
+  const feedbackMaxRound = Math.max(0, ...reportAnswers.map(question => getFeedbackLogs(question).length));
+  const averageFeedbackTrendData = Array.from({ length: feedbackMaxRound }, (_, roundIdx) => {
+    const scores = reportAnswers
+      .map(question => getFeedbackLogs(question)[roundIdx]?.score)
+      .filter((score): score is number => typeof score === 'number');
+    return {
+      name: `${roundIdx + 1}회`,
+      average: scores.length ? Number((scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)) : undefined,
+    };
+  });
+  const answerFeedbackLineKeys = reportAnswers
+    .map((question, idx) => ({ key: `Q${idx + 1}`, hasLogs: Boolean(getFeedbackLogs(question).length) }))
+    .filter(item => item.hasLogs)
+    .map(item => item.key);
+  const answerFeedbackTrendData = Array.from({ length: feedbackMaxRound }, (_, roundIdx) => {
+    const row: Record<string, string | number | undefined> = { name: `${roundIdx + 1}회` };
+    reportAnswers.forEach((question, idx) => {
+      row[`Q${idx + 1}`] = getFeedbackLogs(question)[roundIdx]?.score;
+    });
+    return row;
+  });
+  const answerLineColors = ['#2563eb', '#14b8a6', '#f97316', '#8b5cf6', '#ef4444', '#0ea5e9', '#84cc16', '#f59e0b'];
+
   return (
     <div className={styles.container}>
       <main className={styles.main}>
@@ -170,6 +262,200 @@ export default function InterviewHome() {
               <div className={styles.deleteModalFooter}>
                 <button className={styles.cancelBtn} onClick={() => setSessionPendingDelete(null)} type="button">취소</button>
                 <button className={styles.deleteConfirmBtn} onClick={handleDeleteSession} type="button">삭제</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {reportSession && activeReport && (
+          <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="history-report-modal-title">
+            <div className={styles.reportModalPanel}>
+              <div className={styles.deleteModalHeader}>
+                <div>
+                  <h2 id="history-report-modal-title" className={styles.deleteModalTitle}>전체 면접 평가 리포트</h2>
+                  <p className={styles.reportSubtitle}>{reportSession.company} · {reportSession.job_role}</p>
+                </div>
+                <button className={styles.modalCloseBtn} onClick={() => setReportSession(null)} aria-label="리포트 닫기">×</button>
+              </div>
+              <div className={styles.reportBody}>
+                {activeReport.is_outdated && (
+                  <div className={styles.reportStaleNotice}>
+                    <div>
+                      <strong>이 리포트는 최신 저장 내용이 반영되지 않았습니다.</strong>
+                      <p>이전 답변과 피드백 기준의 리포트입니다. 최신 저장 내용 기준으로 다시 업데이트할 수 있습니다.</p>
+                    </div>
+                    <button
+                      className={styles.submitButton}
+                      onClick={() => handleUpdateSessionReport(reportSession)}
+                      disabled={loadingReportSessionId === reportSession.id}
+                      type="button"
+                    >
+                      {loadingReportSessionId === reportSession.id ? '업데이트 중...' : '리포트 업데이트'}
+                    </button>
+                  </div>
+                )}
+
+                <section className={styles.reportHero}>
+                  <div className={styles.reportScoreBox}>
+                    <div className={styles.reportScore}>{activeReport.overall_score}</div>
+                    <div className={styles.reportScoreLabel}>{activeReport.readiness_label}</div>
+                  </div>
+                  <div className={styles.reportSummary}>
+                    <div className={styles.reportSectionLabel}>면접관 한줄평</div>
+                    <p>{activeReport.interviewer_one_liner}</p>
+                    <div className={styles.reportSectionLabel}>코치 총평</div>
+                    <p>{activeReport.coach_summary}</p>
+                  </div>
+                </section>
+
+                <section className={styles.reportGrid}>
+                  <div className={styles.reportChartCard}>
+                    <h3>역량 분포</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <RadarChart data={dimensionChartData}>
+                        <PolarGrid />
+                        <PolarAngleAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+                        <Radar dataKey="score" stroke="#2563eb" fill="#2563eb" fillOpacity={0.28} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className={styles.reportChartCard}>
+                    <h3>질문별 점수 (5점 만점)</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={questionScoreData}>
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis domain={[0, 5]} tick={{ fontSize: 11 }} />
+                        <Bar dataKey="score" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                {(averageFeedbackTrendData.length > 0 || answerFeedbackLineKeys.length > 0) && (
+                  <section className={styles.reportSection}>
+                    <h3>답변 완성도 변화</h3>
+                    <div className={styles.reportGrid}>
+                      {averageFeedbackTrendData.length > 0 && (
+                        <div className={styles.reportChartCard}>
+                          <h3>전체 답변 평균 점수 변화</h3>
+                          <ResponsiveContainer width="100%" height={220}>
+                            <LineChart data={averageFeedbackTrendData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                              <YAxis domain={[0, 5]} tick={{ fontSize: 11 }} />
+                              <Tooltip formatter={(value) => [`${value}점`, '평균']} />
+                              <Line type="monotone" dataKey="average" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+                      {answerFeedbackLineKeys.length > 0 && (
+                        <div className={styles.reportChartCard}>
+                          <h3>답변별 점수 변화</h3>
+                          <ResponsiveContainer width="100%" height={220}>
+                            <LineChart data={answerFeedbackTrendData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                              <YAxis domain={[0, 5]} tick={{ fontSize: 11 }} />
+                              <Tooltip formatter={(value, name) => [`${value}점`, name]} />
+                              {answerFeedbackLineKeys.map((key, idx) => (
+                                <Line
+                                  key={key}
+                                  type="monotone"
+                                  dataKey={key}
+                                  stroke={answerLineColors[idx % answerLineColors.length]}
+                                  strokeWidth={2}
+                                  dot={{ r: 3 }}
+                                  connectNulls
+                                />
+                              ))}
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+                    </div>
+                    {averageFeedbackTrendData.length < 2 && (
+                      <p className={styles.reportMutedText}>같은 질문이나 여러 답변에 대해 피드백 로그가 더 쌓이면 변화 추이가 더 선명하게 표시됩니다.</p>
+                    )}
+                  </section>
+                )}
+
+                <section className={styles.reportColumns}>
+                  <div>
+                    <h3>강점 TOP 3</h3>
+                    {(activeReport.strengths || []).map((item, idx) => (
+                      <div className={styles.reportListItem} key={`strength-${idx}`}>
+                        <strong>{item.title}</strong>
+                        <p>{item.evidence}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <h3>감점 리스크 TOP 3</h3>
+                    {(activeReport.risks || []).map((item, idx) => (
+                      <div className={styles.reportListItem} key={`risk-${idx}`}>
+                        <strong>{item.title}</strong>
+                        <p>{item.reason}</p>
+                        <span>{item.fix}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {activeReport.answer_growth && (
+                  <section className={styles.reportSection}>
+                    <h3>답변 향상 추이</h3>
+                    <div className={styles.reportGrowthBox}>
+                      <p>{activeReport.answer_growth.summary}</p>
+                      <span>{activeReport.answer_growth.score_trend}</span>
+                    </div>
+                    <div className={styles.reportColumns}>
+                      <div>
+                        <h3>좋아지고 있는 부분</h3>
+                        {(activeReport.answer_growth.improved_points || []).map((item, idx) => (
+                          <div className={styles.reportListItem} key={`growth-good-${idx}`}>
+                            <p>{item}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div>
+                        <h3>아직 남은 보완점</h3>
+                        {(activeReport.answer_growth.remaining_gaps || []).map((item, idx) => (
+                          <div className={styles.reportListItem} key={`growth-gap-${idx}`}>
+                            <p>{item}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                <section className={styles.reportSection}>
+                  <h3>다음 연습 우선순위</h3>
+                  {(activeReport.next_actions || []).map((item, idx) => (
+                    <div className={styles.reportActionItem} key={`action-${idx}`}>
+                      <span>{idx + 1}</span>
+                      <div>
+                        <strong>{item.title}</strong>
+                        <p>{item.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </section>
+
+                <section className={styles.reportSection}>
+                  <h3>질문별 요약 피드백</h3>
+                  {(activeReport.question_reviews || []).map((item, idx) => (
+                    <div className={styles.reportQuestionItem} key={`q-review-${idx}`}>
+                      <div>
+                        <strong>Q{idx + 1}. {item.question}</strong>
+                        <p>{item.summary}</p>
+                      </div>
+                      <span>{item.score === null ? '미평가' : `${item.score}/5점`} · {item.priority}</span>
+                    </div>
+                  ))}
+                </section>
               </div>
             </div>
           </div>
@@ -251,6 +537,7 @@ export default function InterviewHome() {
           <div className={styles.sessionList}>
             {sessions.map((item) => {
               const sessionInterviewType = getSessionInterviewType(item);
+              const sessionReport = getSessionReport(item);
               const sessionTypeStyle = sessionInterviewType === '실무'
                 ? styles.sessionTypePractical
                 : sessionInterviewType === '인성'
@@ -294,6 +581,11 @@ export default function InterviewHome() {
                       <button className={styles.actionButton} onClick={() => handleResumeSession(item)}>
                         {item.stats?.answered_questions === item.stats?.total_questions ? "결과 보기" : "이어 준비"}
                       </button>
+                      {sessionReport && (
+                        <button className={styles.reportButton} onClick={() => setReportSession(item)} type="button">
+                          {sessionReport.is_outdated ? '리포트 보기 · 업데이트 필요' : '리포트 보기'}
+                        </button>
+                      )}
                       <button className={styles.deleteSessionButton} onClick={() => setSessionPendingDelete(item)} type="button" aria-label="면접 이력 삭제">
                         삭제
                       </button>

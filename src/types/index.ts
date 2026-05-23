@@ -108,6 +108,46 @@ export interface AnswerFeedback {
   follow_up_hint: string;
 }
 
+export interface FeedbackLog {
+  score: number;
+  answer: string;
+  strengths: string[];
+  improvement: string;
+  risk_points: RiskPoint[];
+  created_at: string;
+}
+
+export interface OverallInterviewReport {
+  overall_score: number;
+  readiness_label: string;
+  coach_summary: string;
+  interviewer_one_liner: string;
+  dimension_scores: Record<string, number>;
+  strengths: { title: string; evidence: string }[];
+  risks: { title: string; reason: string; fix: string }[];
+  question_reviews: {
+    question: string;
+    score: number | null;
+    summary: string;
+    priority: string;
+  }[];
+  next_actions: { title: string; detail: string }[];
+  answer_growth?: {
+    summary: string;
+    score_trend: string;
+    improved_points: string[];
+    remaining_gaps: string[];
+  };
+  visual_summary?: {
+    answered_count: number;
+    total_questions: number;
+    top_dimension: string;
+    weak_dimension: string;
+  };
+  generated_at?: string;
+  is_outdated?: boolean;
+}
+
 export interface InterviewQuestion {
   id: string;
   question: string;
@@ -118,6 +158,7 @@ export interface InterviewQuestion {
   axis_weight?: number;
   userAnswer?: string;
   feedback?: AnswerFeedback;
+  feedbackLogs?: FeedbackLog[];
   followUps?: FollowUpQuestion[];
 }
 
@@ -177,7 +218,9 @@ export interface InterviewSession {
     total_questions: number;
     answered_questions: number;
     score: number | null;
+    overall_report?: OverallInterviewReport;
   };
+  overall_report?: OverallInterviewReport;
 }
 
 /** 압박 꼬리질문 */

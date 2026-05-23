@@ -11,7 +11,14 @@ import type {
   MockContextResponse,
   InterviewSession,
   InterviewSourcesResponse,
+  OverallInterviewReport,
 } from '../types';
+
+const getFeedbackLogs = (question: InterviewQuestion) => (
+  question.feedbackLogs?.length
+    ? question.feedbackLogs
+    : ((question.feedback as NonNullable<typeof question.feedback> & { feedback_logs?: typeof question.feedbackLogs })?.feedback_logs || [])
+);
 
 export const interviewService = {
   /** 지원 가능한 포지션 목록 (서비스 내 분석 완료된 기업-직무) */
@@ -162,23 +169,23 @@ export const interviewService = {
     return data;
   },
 
-  /** 세션 저장 */
-  saveSession: async (
+  /** 전체 면접 종합 리포트 생성 */
+  getOverallReport: async (
     company: string,
     jobRole: string,
+    interviewType: string,
     answers: InterviewQuestion[],
-    sessionId?: string,
     axesUsed?: EvaluationAxis[],
-    interviewType: string = "전체",
-    axisType: string = "static"
-  ): Promise<{ message: string; session_id: string }> => {
-    const { data } = await api.post('/interview/sessions', {
-      session_id: sessionId,
+    analysisId?: number,
+    resumeId?: number
+  ): Promise<OverallInterviewReport> => {
+    const { data } = await api.post('/interview/overall-report', {
       company,
       job_role: jobRole,
       interview_type: interviewType,
-      axis_type: axisType,
       axes_used: axesUsed,
+      analysis_id: analysisId,
+      resume_id: resumeId,
       answers: answers.map((q) => ({
         id: q.id,
         question: q.question,
@@ -188,6 +195,42 @@ export const interviewService = {
         axis_name: q.axis_name,
         userAnswer: q.userAnswer || '',
         feedback: q.feedback ? JSON.stringify(q.feedback) : undefined,
+        feedbackLogs: getFeedbackLogs(q),
+        followUps: q.followUps,
+      })),
+    });
+    return data;
+  },
+
+  /** 세션 저장 */
+  saveSession: async (
+    company: string,
+    jobRole: string,
+    answers: InterviewQuestion[],
+    sessionId?: string,
+    axesUsed?: EvaluationAxis[],
+    interviewType: string = "전체",
+    axisType: string = "static",
+    overallReport?: OverallInterviewReport
+  ): Promise<{ message: string; session_id: string }> => {
+    const { data } = await api.post('/interview/sessions', {
+      session_id: sessionId,
+      company,
+      job_role: jobRole,
+      interview_type: interviewType,
+      axis_type: axisType,
+      axes_used: axesUsed,
+      overall_report: overallReport,
+      answers: answers.map((q) => ({
+        id: q.id,
+        question: q.question,
+        category: q.category,
+        tips: q.tips,
+        evaluation_axis: q.evaluation_axis,
+        axis_name: q.axis_name,
+        userAnswer: q.userAnswer || '',
+        feedback: q.feedback ? JSON.stringify(q.feedback) : undefined,
+        feedbackLogs: getFeedbackLogs(q),
         followUps: q.followUps
       })),
     });
