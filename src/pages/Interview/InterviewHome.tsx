@@ -127,7 +127,7 @@ export default function InterviewHome() {
                 className={styles.submitButton}
                 onClick={() => handleStartInterview("static")}
                 disabled={loading || positions.length === 0}
-                style={{ backgroundColor: 'var(--border)', color: 'var(--text-h)' }}
+                style={{ backgroundColor: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
               >
                 {loading ? '생성 중...' : '기존 평가축으로 생성'}
               </button>
@@ -158,7 +158,7 @@ export default function InterviewHome() {
         
         {sessions.length === 0 ? (
           <div className={styles.card} style={{ textAlign: 'center', padding: '3rem' }}>
-            <p style={{ color: 'var(--text)' }}>저장된 면접 세션이 없습니다.</p>
+            <p style={{ color: 'var(--color-text-secondary)' }}>저장된 면접 세션이 없습니다.</p>
           </div>
         ) : (
           <div className={styles.sessionList}>

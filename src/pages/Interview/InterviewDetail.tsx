@@ -35,7 +35,7 @@ export default function InterviewDetail() {
   if (!state) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <h2 style={{ color: 'var(--text-h)' }}>잘못된 접근입니다.</h2>
+        <h2 style={{ color: 'var(--color-text)' }}>잘못된 접근입니다.</h2>
         <button className={styles.primaryBtn} onClick={() => navigate(ROUTES.INTERVIEW)}>홈으로 돌아가기</button>
       </div>
     );

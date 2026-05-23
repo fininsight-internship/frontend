@@ -1,13 +1,18 @@
 .container {
-  min-height: 100vh;
-  background-color: var(--bg);
+  min-height: calc(100vh - 4rem);
+  max-width: 1180px;
   display: flex;
   flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
 }
 
 .topBar {
-  background-color: var(--card-bg, rgba(255, 255, 255, 0.05));
-  border-bottom: 1px solid var(--border);
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
   padding: 0.875rem 2rem;
   display: flex;
   align-items: center;
@@ -17,13 +22,13 @@
 .backButton {
   background: none;
   border: none;
-  color: var(--text);
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0.25rem;
 }
 
 .backButton:hover {
-  color: var(--text-h);
+  color: var(--color-text);
 }
 
 .topInfo {
@@ -33,12 +38,12 @@
 .topTitle {
   font-size: 0.875rem;
   font-weight: 700;
-  color: var(--text-h);
+  color: var(--color-text);
 }
 
 .topSubtitle {
   font-size: 0.75rem;
-  color: var(--text);
+  color: var(--color-text-secondary);
   margin-top: 0.125rem;
 }
 
@@ -50,21 +55,21 @@
 
 .secondaryBtn {
   font-size: 0.75rem;
-  border: 1px solid var(--border);
-  color: var(--text-h);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
-  background-color: var(--bg);
+  background-color: var(--color-bg);
   cursor: pointer;
 }
 
 .secondaryBtn:hover {
-  background-color: var(--border);
+  background-color: var(--color-border-light);
 }
 
 .primaryBtn {
   font-size: 0.75rem;
-  background-color: var(--accent, #2563eb);
+  background-color: var(--color-primary);
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
@@ -81,12 +86,13 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  background: var(--color-surface);
 }
 
 .sidebar {
   width: 16rem;
-  background-color: var(--card-bg, rgba(255, 255, 255, 0.05));
-  border-right: 1px solid var(--border);
+  background-color: var(--color-surface);
+  border-right: 1px solid var(--color-border);
   padding: 1rem;
   overflow-y: auto;
 }
@@ -94,7 +100,7 @@
 .sidebarTitle {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.75rem;
@@ -115,11 +121,11 @@
 }
 
 .qItem:hover {
-  background-color: var(--border);
+  background-color: var(--color-bg);
 }
 
 .qItemActive {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: var(--color-primary-light);
   border-color: rgba(59, 130, 246, 0.2);
 }
 
@@ -148,13 +154,13 @@
 }
 
 .qNumActive {
-  background-color: var(--accent, #2563eb);
+  background-color: var(--color-primary);
   color: white;
 }
 
 .qNumPending {
-  background-color: var(--border);
-  color: var(--text);
+  background-color: var(--color-border);
+  color: var(--color-text-secondary);
 }
 
 .qType {
@@ -164,15 +170,15 @@
   font-weight: 500;
 }
 
-.typeResume { background-color: rgba(147, 51, 234, 0.1); color: #c084fc; }
-.typeJob { background-color: rgba(37, 99, 235, 0.1); color: #60a5fa; }
-.typeCompany { background-color: rgba(22, 163, 74, 0.1); color: #4ade80; }
-.typeDefault { background-color: var(--border); color: var(--text); }
+.typeResume { background-color: rgba(147, 51, 234, 0.1); color: #7e22ce; }
+.typeJob { background-color: rgba(37, 99, 235, 0.1); color: var(--color-primary); }
+.typeCompany { background-color: var(--color-success-light); color: #15803d; }
+.typeDefault { background-color: var(--color-border); color: var(--color-text-secondary); }
 
 .qScore {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #4ade80;
+  color: #15803d;
   margin-left: auto;
 }
 
@@ -186,12 +192,12 @@
 }
 
 .qTextActive {
-  color: #60a5fa;
+  color: var(--color-primary);
   font-weight: 500;
 }
 
 .qTextInactive {
-  color: var(--text);
+  color: var(--color-text-secondary);
 }
 
 .mainArea {
@@ -201,13 +207,14 @@
   padding: 1.5rem;
   overflow-y: auto;
   gap: 1rem;
+  background: var(--color-bg);
 }
 
 .card {
-  background-color: var(--card-bg, rgba(255, 255, 255, 0.05));
-  border-radius: 1rem;
-  border: 1px solid var(--border);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  background-color: var(--color-surface);
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-xs);
   padding: 1.5rem;
 }
 
@@ -231,7 +238,7 @@
 .qCardTypeBadge {
   font-size: 0.75rem;
   background-color: rgba(126, 34, 206, 0.1);
-  color: #c084fc;
+  color: #7e22ce;
   padding: 0.25rem 0.625rem;
   border-radius: 0.5rem;
   font-weight: 600;
@@ -239,7 +246,7 @@
 
 .qCardNum {
   font-size: 0.75rem;
-  color: var(--text);
+  color: var(--color-text-secondary);
 }
 
 .qCardAxis {
@@ -247,34 +254,34 @@
   align-items: center;
   gap: 0.25rem;
   font-size: 0.75rem;
-  color: var(--text);
+  color: var(--color-text-secondary);
 }
 
 .qCardQuestion {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--text-h);
+  color: var(--color-text);
   margin-bottom: 0.75rem;
 }
 
 .qCardTip {
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: var(--color-bg);
   border-radius: 0.75rem;
   padding: 1rem;
   font-size: 0.75rem;
-  color: var(--text);
+  color: var(--color-text-secondary);
   line-height: 1.5;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
 }
 
 .qCardTip span {
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--color-text);
 }
 
 .axesSection {
   margin-top: 1rem;
-  border-top: 1px dashed var(--border);
+  border-top: 1px dashed var(--color-border);
   padding-top: 1rem;
 }
 
@@ -298,15 +305,15 @@
   justify-content: space-between;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--color-text);
   margin-bottom: 0.5rem;
 }
 
 .axesRevealBtn {
   font-size: 0.75rem;
   background-color: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
   cursor: pointer;
@@ -324,18 +331,18 @@
 .axesCard {
   padding: 0.5rem;
   border-radius: 0.5rem;
-  background-color: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
 }
 .axesCardName {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--color-text);
   margin-bottom: 0.25rem;
 }
 .axesCardDesc {
   font-size: 0.65rem;
-  color: var(--text);
+  color: var(--color-text-secondary);
   line-height: 1.3;
 }
 
@@ -349,7 +356,7 @@
 .answerTitle {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--color-text);
 }
 
 .starGuide {
@@ -361,7 +368,7 @@
 
 .starGuideText {
   font-weight: 600;
-  color: #60a5fa;
+  color: var(--color-primary);
 }
 
 .starBlocks {
@@ -381,23 +388,23 @@
 }
 
 .starBlockActive {
-  background-color: rgba(34, 197, 94, 0.2);
-  color: #4ade80;
+  background-color: var(--color-success-light);
+  color: #15803d;
 }
 
 .starBlockInactive {
-  background-color: var(--border);
-  color: var(--text);
+  background-color: var(--color-border);
+  color: var(--color-text-secondary);
 }
 
 .textarea {
   width: 100%;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   border-radius: 0.75rem;
   padding: 1rem;
   font-size: 0.875rem;
-  color: var(--text-h);
-  background-color: var(--bg);
+  color: var(--color-text);
+  background-color: var(--color-bg);
   line-height: 1.5;
   resize: none;
   box-sizing: border-box;
@@ -418,11 +425,11 @@
 
 .charCount {
   font-size: 0.75rem;
-  color: var(--text);
+  color: var(--color-text-secondary);
 }
 
 .feedbackBtn {
-  background-color: var(--accent, #2563eb);
+  background-color: var(--color-primary);
   color: white;
   font-size: 0.75rem;
   padding: 0.5rem 1.25rem;
@@ -447,13 +454,13 @@
 .fbTitle {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--color-text);
 }
 
 .fbScore {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #60a5fa;
+  color: var(--color-primary);
 }
 
 .fbGrid {
@@ -465,8 +472,8 @@
 }
 
 .fbGridItem {
-  background-color: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   padding: 1rem;
   display: flex;
@@ -476,16 +483,16 @@
 .fbGridLabel {
   font-size: 0.875rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--color-primary);
   margin-bottom: 0.5rem;
   padding-bottom: 0.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .listContainer {
   margin: 0;
   padding-left: 1.2rem;
-  color: var(--text-h);
+  color: var(--color-text);
   font-size: 0.875rem;
   line-height: 1.5;
 }
@@ -520,18 +527,23 @@
 
 .followUpSection {
   margin-top: 1rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-xs);
+  padding: 1.5rem;
 }
 
 .followUpTitle {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--color-text);
   margin-bottom: 0.5rem;
 }
 
 .followUpItem {
-  background-color: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   padding: 0.75rem;
   border-radius: 0.5rem;
   margin-bottom: 0.5rem;
@@ -540,13 +552,13 @@
 .followUpQ {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-h);
+  color: var(--color-text);
   margin-bottom: 0.25rem;
 }
 
 .followUpIntent {
   font-size: 0.75rem;
-  color: var(--text);
+  color: var(--color-text-secondary);
 }
 
 .spin {
@@ -565,9 +577,9 @@
 
 .fuAnswerArea {
   margin-top: 0.75rem;
-  background-color: var(--bg);
+  background-color: var(--color-bg);
   border-radius: 0.5rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   padding: 0.75rem;
 }
 
@@ -575,7 +587,7 @@
   width: 100%;
   border: none;
   background-color: transparent;
-  color: var(--text-h);
+  color: var(--color-text);
   font-size: 0.875rem;
   resize: vertical;
   min-height: 60px;
@@ -594,7 +606,7 @@
   background-color: rgba(59, 130, 246, 0.1);
   border-radius: 0.5rem;
   font-size: 0.875rem;
-  color: var(--text-h);
+  color: var(--color-text);
   border-left: 3px solid #60a5fa;
   line-height: 1.5;
 }
