@@ -219,8 +219,30 @@
 }
 
 .sessionType {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.125rem 0.5rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.sessionTypeBehavioral {
+  color: #15803d;
+  background-color: var(--color-success-light);
+  border-color: rgba(21, 128, 61, 0.15);
+}
+
+.sessionTypePractical {
   color: var(--color-primary);
-  font-weight: 500;
+  background-color: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.15);
+}
+
+.sessionTypeMixed {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg);
+  border-color: var(--color-border);
 }
 
 .sessionDate {

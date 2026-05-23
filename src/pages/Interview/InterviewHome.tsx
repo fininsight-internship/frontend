@@ -132,6 +132,19 @@ export default function InterviewHome() {
     }
   };
 
+  const getSessionInterviewType = (session: InterviewSession) => {
+    if (session.interview_type === '인성' || session.interview_type === '실무') return session.interview_type;
+
+    const behavioralCategories = ['behavioral', 'situational', 'values', 'growth', 'communication'];
+    const practicalCategories = ['technical', 'problem_solving', 'project', 'design', 'impact'];
+    const behavioralCount = session.answers.filter(q => behavioralCategories.includes(q.category)).length;
+    const practicalCount = session.answers.filter(q => practicalCategories.includes(q.category)).length;
+
+    if (practicalCount > behavioralCount) return '실무';
+    if (behavioralCount > practicalCount) return '인성';
+    return '혼합';
+  };
+
   return (
     <div className={styles.container}>
       <main className={styles.main}>
@@ -236,60 +249,71 @@ export default function InterviewHome() {
           </div>
         ) : (
           <div className={styles.sessionList}>
-            {sessions.map((item) => (
-              <div key={item.id} className={styles.sessionItem}>
-                <div className={styles.sessionTop}>
-                  <div className={styles.sessionCompanyInfo}>
-                    <div className={styles.companyLogo}>
-                      {item.company[0]}
-                    </div>
-                    <div>
-                      <div className={styles.sessionTitle}>{item.company} · {item.job_role}</div>
-                      <div className={styles.sessionMeta}>
-                        <span className={styles.sessionDate}>{new Date(item.created_at).toLocaleDateString()}</span>
+            {sessions.map((item) => {
+              const sessionInterviewType = getSessionInterviewType(item);
+              const sessionTypeStyle = sessionInterviewType === '실무'
+                ? styles.sessionTypePractical
+                : sessionInterviewType === '인성'
+                  ? styles.sessionTypeBehavioral
+                  : styles.sessionTypeMixed;
+
+              return (
+                <div key={item.id} className={styles.sessionItem}>
+                  <div className={styles.sessionTop}>
+                    <div className={styles.sessionCompanyInfo}>
+                      <div className={styles.companyLogo}>
+                        {item.company[0]}
+                      </div>
+                      <div>
+                        <div className={styles.sessionTitle}>{item.company} · {item.job_role}</div>
+                        <div className={styles.sessionMeta}>
+                          <span className={`${styles.sessionType} ${sessionTypeStyle}`}>
+                            {sessionInterviewType} 면접
+                          </span>
+                          <span className={styles.sessionDate}>{new Date(item.created_at).toLocaleDateString()}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className={styles.sessionStats}>
-                    {item.stats && (
-                      <>
-                        <div className={styles.statCol}>
-                          <div className={styles.statLabel}>답변 완료</div>
-                          <div className={styles.statValue}>{item.stats.answered_questions}/{item.stats.total_questions}</div>
-                        </div>
-                        {item.stats.score !== null && (
+                    <div className={styles.sessionStats}>
+                      {item.stats && (
+                        <>
                           <div className={styles.statCol}>
-                            <div className={styles.statLabel}>종합 점수</div>
-                            <div className={`${styles.statValueScore} ${item.stats.score >= 85 ? styles.statScoreGood : styles.statScoreNormal}`}>
-                              {Math.round(item.stats.score)}점
-                            </div>
+                            <div className={styles.statLabel}>답변 완료</div>
+                            <div className={styles.statValue}>{item.stats.answered_questions}/{item.stats.total_questions}</div>
                           </div>
-                        )}
-                      </>
-                    )}
-                    <button className={styles.actionButton} onClick={() => handleResumeSession(item)}>
-                      {item.stats?.answered_questions === item.stats?.total_questions ? "결과 보기" : "이어 준비"}
-                    </button>
-                    <button className={styles.deleteSessionButton} onClick={() => setSessionPendingDelete(item)} type="button" aria-label="면접 이력 삭제">
-                      삭제
-                    </button>
-                  </div>
-                </div>
-                
-                {item.stats && (
-                  <div className={styles.progressBarContainer}>
-                    <div className={styles.progressBarBg}>
-                      <div 
-                        className={styles.progressBarFill} 
-                        style={{ width: `${(item.stats.answered_questions / item.stats.total_questions) * 100}%` }}
-                      ></div>
+                          {item.stats.score !== null && (
+                            <div className={styles.statCol}>
+                              <div className={styles.statLabel}>종합 점수</div>
+                              <div className={`${styles.statValueScore} ${item.stats.score >= 85 ? styles.statScoreGood : styles.statScoreNormal}`}>
+                                {Math.round(item.stats.score)}점
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <button className={styles.actionButton} onClick={() => handleResumeSession(item)}>
+                        {item.stats?.answered_questions === item.stats?.total_questions ? "결과 보기" : "이어 준비"}
+                      </button>
+                      <button className={styles.deleteSessionButton} onClick={() => setSessionPendingDelete(item)} type="button" aria-label="면접 이력 삭제">
+                        삭제
+                      </button>
                     </div>
-                    <span className={styles.progressText}>{Math.round((item.stats.answered_questions / item.stats.total_questions) * 100)}%</span>
                   </div>
-                )}
-              </div>
-            ))}
+                
+                  {item.stats && (
+                    <div className={styles.progressBarContainer}>
+                      <div className={styles.progressBarBg}>
+                        <div 
+                          className={styles.progressBarFill} 
+                          style={{ width: `${(item.stats.answered_questions / item.stats.total_questions) * 100}%` }}
+                        ></div>
+                      </div>
+                      <span className={styles.progressText}>{Math.round((item.stats.answered_questions / item.stats.total_questions) * 100)}%</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </main>
