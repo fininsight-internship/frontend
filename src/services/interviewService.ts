@@ -1,5 +1,6 @@
 import api from './api';
 import type {
+  AdditionalQuestionsResponse,
   AvailablePosition,
   EvaluateAxesResponse,
   EvaluationAxis,
@@ -59,6 +60,32 @@ export const interviewService = {
       resume_id: resumeId,
     }, {
       timeout: 90000 // 90 seconds specific timeout for heavy multi-stage LLM generation
+    });
+    return data;
+  },
+
+  /** 기존 면접 세션에 추가할 질문 생성 */
+  getAdditionalQuestions: async (
+    company: string,
+    jobRole: string,
+    interviewType: string,
+    selectedAxes: EvaluationAxis[],
+    questionCount: number,
+    existingQuestions: string[],
+    analysisId?: number,
+    resumeId?: number
+  ): Promise<AdditionalQuestionsResponse> => {
+    const { data } = await api.post('/interview/questions/additional', {
+      company,
+      job_role: jobRole,
+      interview_type: interviewType,
+      selected_axes: selectedAxes,
+      question_count: questionCount,
+      existing_questions: existingQuestions,
+      analysis_id: analysisId,
+      resume_id: resumeId,
+    }, {
+      timeout: 90000
     });
     return data;
   },
@@ -133,12 +160,16 @@ export const interviewService = {
     jobRole: string,
     answers: InterviewQuestion[],
     sessionId?: string,
-    axesUsed?: EvaluationAxis[]
+    axesUsed?: EvaluationAxis[],
+    interviewType: string = "전체",
+    axisType: string = "static"
   ): Promise<{ message: string; session_id: string }> => {
     const { data } = await api.post('/interview/sessions', {
       session_id: sessionId,
       company,
       job_role: jobRole,
+      interview_type: interviewType,
+      axis_type: axisType,
       axes_used: axesUsed,
       answers: answers.map((q) => ({
         id: q.id,

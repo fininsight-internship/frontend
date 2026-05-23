@@ -128,6 +128,11 @@ export interface QuestionsResponse {
   axes_used: EvaluationAxis[];
 }
 
+export interface AdditionalQuestionsResponse {
+  questions: InterviewQuestion[];
+  sources: { id: string; label: string }[];
+}
+
 export interface InterviewAnalysisSource {
   id: number;
   company_name: string;
@@ -163,6 +168,8 @@ export interface InterviewSession {
   id: string;
   company: string;
   job_role: string;
+  interview_type?: string;
+  axis_type?: string;
   answers: InterviewQuestion[];
   axes_used?: EvaluationAxis[];
   created_at: string;

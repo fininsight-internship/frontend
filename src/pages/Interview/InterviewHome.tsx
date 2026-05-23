@@ -11,7 +11,7 @@ export default function InterviewHome() {
   const [sessions, setSessions] = useState<InterviewSession[]>([]);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string>('');
   const [selectedResumeId, setSelectedResumeId] = useState<string>('');
-  const [interviewType, setInterviewType] = useState<string>('전체');
+  const [interviewType, setInterviewType] = useState<string>('인성');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -80,6 +80,8 @@ export default function InterviewHome() {
           featureWeights: qRes.feature_weights,
           analysisId,
           resumeId,
+          interviewType,
+          axisType,
           isNew: true
         }
       });
@@ -108,6 +110,8 @@ export default function InterviewHome() {
         axesUsed: session.axes_used || [],
         questions: session.answers,
         featureWeights: {},
+        interviewType: session.interview_type || '전체',
+        axisType: session.axis_type || 'dynamic',
         isNew: false,
         sessionId: session.id
       }
@@ -166,21 +170,9 @@ export default function InterviewHome() {
                 value={interviewType}
                 onChange={(e) => setInterviewType(e.target.value)}
               >
-                <option value="전체">전체 (혼합)</option>
                 <option value="인성">인성 면접 (경험/상황 위주)</option>
                 <option value="실무">실무 면접 (기술/직무 지식 위주)</option>
               </select>
-            </div>
-            
-            <div className={styles.inputGroup} style={{ alignSelf: 'flex-end' }}>
-              <button 
-                className={styles.submitButton}
-                onClick={() => handleStartInterview("static")}
-                disabled={loading || !selectedAnalysisId}
-                style={{ backgroundColor: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
-              >
-                {loading ? '생성 중...' : '기존 평가축으로 생성'}
-              </button>
             </div>
 
             <div className={styles.inputGroup} style={{ alignSelf: 'flex-end' }}>
@@ -193,9 +185,7 @@ export default function InterviewHome() {
                   <><span className={styles.spin} style={{ marginRight: '8px' }}></span> 생성 중...</>
                 ) : (
     <>
-      AI 동적 평가축으로
-      <br />
-      생성 ✨
+      평가기준 추출 및 질문 생성 ✨
     </>
   )}
               </button>

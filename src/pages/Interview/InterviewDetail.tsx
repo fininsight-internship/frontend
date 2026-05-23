@@ -5,6 +5,8 @@ import type { AvailablePosition, EvaluationAxis, InterviewQuestion, AnswerFeedba
 import styles from './InterviewDetail.module.css';
 import { ROUTES } from '../../constants';
 
+type AddQuestionMode = 'ai' | 'manual';
+
 export default function InterviewDetail() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -16,6 +18,8 @@ export default function InterviewDetail() {
     featureWeights: Record<string, number>;
     analysisId?: number;
     resumeId?: number;
+    interviewType?: string;
+    axisType?: string;
     isNew: boolean;
     sessionId?: string;
   } | undefined;
@@ -34,6 +38,13 @@ export default function InterviewDetail() {
 
   const [showAxesModal, setShowAxesModal] = useState(false);
   const [showQuestionGuide, setShowQuestionGuide] = useState(false);
+  const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
+  const [addQuestionMode, setAddQuestionMode] = useState<AddQuestionMode>('ai');
+  const [selectedAddAxisKeys, setSelectedAddAxisKeys] = useState<string[]>([]);
+  const [addQuestionCount, setAddQuestionCount] = useState(1);
+  const [manualQuestion, setManualQuestion] = useState('');
+  const [manualAxisKey, setManualAxisKey] = useState('');
+  const [loadingAddQuestions, setLoadingAddQuestions] = useState(false);
 
   if (!state) {
     return (
@@ -45,6 +56,20 @@ export default function InterviewDetail() {
   }
 
   const { position, featureWeights, axesUsed, analysisId, resumeId } = state;
+  const interviewType = state.interviewType || '전체';
+  const axisType = state.axisType || 'dynamic';
+  const behavioralCategories = ['behavioral', 'situational', 'values', 'growth', 'communication'];
+  const practicalCategories = ['technical', 'problem_solving', 'project', 'design', 'impact'];
+  const inferInterviewType = () => {
+    if (interviewType === '인성' || interviewType === '실무') return interviewType;
+
+    const practicalCount = questions.filter(q => practicalCategories.includes(q.category)).length;
+    const behavioralCount = questions.filter(q => behavioralCategories.includes(q.category)).length;
+    if (practicalCount > behavioralCount) return '실무';
+    if (behavioralCount > practicalCount) return '인성';
+    return interviewType;
+  };
+  const effectiveInterviewType = inferInterviewType();
 
   const activeQuestionIndex = questions.findIndex(q => q.id === activeQuestionId);
   const activeQuestion = questions[activeQuestionIndex];
@@ -156,7 +181,7 @@ export default function InterviewDetail() {
 
   const handleSave = async () => {
     try {
-      await interviewService.saveSession(position.company, position.job_role, questions, state.sessionId, axesUsed);
+      await interviewService.saveSession(position.company, position.job_role, questions, state.sessionId, axesUsed, effectiveInterviewType, axisType);
       alert('저장되었습니다! 면접 목록으로 이동합니다.');
       navigate(ROUTES.INTERVIEW);
     } catch {
@@ -166,12 +191,123 @@ export default function InterviewDetail() {
 
   const categoryLabel = (c: string) => {
     if (c === 'behavioral') return { label: '인성/경험', style: styles.typeCompany };
+    if (c === 'situational') return { label: '상황 판단', style: styles.typeSituational };
+    if (c === 'values') return { label: '가치관', style: styles.typeValues };
+    if (c === 'growth') return { label: '성장 가능성', style: styles.typeGrowth };
+    if (c === 'communication') return { label: '커뮤니케이션', style: styles.typeCommunication };
     if (c === 'technical') return { label: '직무/기술', style: styles.typeJob };
-    if (c === 'resume') return { label: '자소서', style: styles.typeResume };
+    if (c === 'problem_solving') return { label: '문제 해결', style: styles.typeProblemSolving };
+    if (c === 'project') return { label: '프로젝트', style: styles.typeProject };
+    if (c === 'design') return { label: '설계/구조화', style: styles.typeDesign };
+    if (c === 'impact') return { label: '성과/임팩트', style: styles.typeImpact };
     return { label: '기본', style: styles.typeDefault };
   };
 
+  const createQuestionId = () => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return `q-${crypto.randomUUID().slice(0, 8)}`;
+    }
+    return `q-${Date.now().toString(36)}`;
+  };
+
+  const getDefaultCategory = () => {
+    if (effectiveInterviewType === '실무') return 'technical';
+    if (effectiveInterviewType === '인성') return 'behavioral';
+    return activeQuestion?.category || questions[0]?.category || 'behavioral';
+  };
+
+  const openAddQuestionModal = () => {
+    const firstAxisKey = axesUsed?.[0]?.key || '';
+    setAddQuestionMode('ai');
+    setSelectedAddAxisKeys(firstAxisKey ? [firstAxisKey] : []);
+    setAddQuestionCount(1);
+    setManualQuestion('');
+    setManualAxisKey(firstAxisKey);
+    setShowAddQuestionModal(true);
+  };
+
+  const toggleAddAxis = (axisKey: string) => {
+    setSelectedAddAxisKeys(prev => {
+      const next = prev.includes(axisKey)
+        ? prev.filter(key => key !== axisKey)
+        : [...prev, axisKey];
+      setAddQuestionCount(count => Math.max(count, next.length || 1));
+      return next;
+    });
+  };
+
+  const handleAddQuestionCountChange = (value: string) => {
+    const next = Number(value);
+    if (Number.isNaN(next)) return;
+    setAddQuestionCount(Math.max(1, next));
+  };
+
+  const handleGenerateAdditionalQuestions = async () => {
+    if (selectedAddAxisKeys.length === 0) {
+      alert('평가 기준을 1개 이상 선택해주세요.');
+      return;
+    }
+    if (addQuestionCount < selectedAddAxisKeys.length) {
+      alert(`선택한 평가 기준이 ${selectedAddAxisKeys.length}개이므로 ${selectedAddAxisKeys.length}개 이상 생성해야 합니다.`);
+      return;
+    }
+
+    const selectedAxes = axesUsed.filter(ax => selectedAddAxisKeys.includes(ax.key));
+    setLoadingAddQuestions(true);
+    try {
+      const res = await interviewService.getAdditionalQuestions(
+        position.company,
+        position.job_role,
+        effectiveInterviewType,
+        selectedAxes,
+        addQuestionCount,
+        questions.map(q => q.question),
+        analysisId,
+        resumeId
+      );
+      const newQuestions = res.questions.map(q => ({ ...q, userAnswer: '' }));
+      setQuestions(prev => [...prev, ...newQuestions]);
+      if (newQuestions[0]) {
+        setActiveQuestionId(newQuestions[0].id);
+        setShowQuestionGuide(false);
+      }
+      setShowAddQuestionModal(false);
+    } catch {
+      alert('추가 질문 생성에 실패했습니다.');
+    } finally {
+      setLoadingAddQuestions(false);
+    }
+  };
+
+  const handleAddManualQuestion = () => {
+    const questionText = manualQuestion.trim();
+    if (!questionText) {
+      alert('추가할 질문을 입력해주세요.');
+      return;
+    }
+
+    const selectedAxis = axesUsed.find(ax => ax.key === manualAxisKey);
+    const newQuestion: InterviewQuestion = {
+      id: createQuestionId(),
+      question: questionText,
+      category: getDefaultCategory(),
+      tips: selectedAxis
+        ? `${selectedAxis.name} 관점에서 ${selectedAxis.description} 답변의 근거와 구체성을 확인합니다.`
+        : '직접 추가한 질문입니다. 답변의 구체성, 직무 연관성, 근거의 설득력을 중심으로 확인합니다.',
+      evaluation_axis: selectedAxis?.key,
+      axis_name: selectedAxis?.name,
+      axis_weight: selectedAxis?.weight,
+      userAnswer: '',
+    };
+
+    setQuestions(prev => [...prev, newQuestion]);
+    setActiveQuestionId(newQuestion.id);
+    setShowQuestionGuide(false);
+    setShowAddQuestionModal(false);
+  };
+
   const answeredCount = questions.filter(q => (q.userAnswer || '').trim().length > 0).length;
+  const minimumQuestionCount = Math.max(1, selectedAddAxisKeys.length);
 
   return (
     <div className={styles.container}>
@@ -214,6 +350,118 @@ export default function InterviewDetail() {
         </div>
       )}
 
+      {showAddQuestionModal && (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="add-question-modal-title">
+          <div className={styles.addQuestionModalPanel}>
+            <div className={styles.addQuestionHeader}>
+              <div>
+                <h2 id="add-question-modal-title" className={styles.addQuestionTitle}>추가 질문 생성</h2>
+                <p className={styles.addQuestionSubtitle}>{position.company} · {position.job_role} 기준</p>
+              </div>
+              <button className={styles.modalCloseBtn} onClick={() => setShowAddQuestionModal(false)} aria-label="추가 질문 닫기">×</button>
+            </div>
+
+            <div className={styles.addQuestionBody}>
+              <div className={styles.segmentedControl} role="tablist" aria-label="질문 추가 방식">
+                <button
+                  className={`${styles.segmentedButton} ${addQuestionMode === 'ai' ? styles.segmentedButtonActive : ''}`}
+                  onClick={() => setAddQuestionMode('ai')}
+                  type="button"
+                >
+                  AI 자동 생성
+                </button>
+                <button
+                  className={`${styles.segmentedButton} ${addQuestionMode === 'manual' ? styles.segmentedButtonActive : ''}`}
+                  onClick={() => setAddQuestionMode('manual')}
+                  type="button"
+                >
+                  직접 입력
+                </button>
+              </div>
+
+              {addQuestionMode === 'ai' ? (
+                <>
+                  <section className={styles.addQuestionSection}>
+                    <h3 className={styles.addQuestionSectionTitle}>평가 기준 선택</h3>
+                    <div className={styles.axisChoiceGrid}>
+                      {axesUsed.map(axis => {
+                        const selected = selectedAddAxisKeys.includes(axis.key);
+                        return (
+                          <button
+                            key={axis.key}
+                            type="button"
+                            className={`${styles.axisChoice} ${selected ? styles.axisChoiceSelected : ''}`}
+                            onClick={() => toggleAddAxis(axis.key)}
+                          >
+                            <span className={styles.axisChoiceName}>{axis.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  <section className={styles.addQuestionSection}>
+                    <h3 className={styles.addQuestionSectionTitle}>생성 개수</h3>
+                    <p className={styles.addQuestionHint}>{minimumQuestionCount}개 이상 질문을 생성해주세요</p>
+                    <input
+                      className={styles.countInput}
+                      type="number"
+                      min={minimumQuestionCount}
+                      max={10}
+                      value={addQuestionCount}
+                      onChange={(e) => handleAddQuestionCountChange(e.target.value)}
+                    />
+                  </section>
+                </>
+              ) : (
+                <>
+                  <section className={styles.addQuestionSection}>
+                    <h3 className={styles.addQuestionSectionTitle}>질문 입력</h3>
+                    <textarea
+                      className={styles.manualQuestionTextarea}
+                      value={manualQuestion}
+                      onChange={(e) => setManualQuestion(e.target.value)}
+                      placeholder="추가할 면접 질문을 입력해주세요."
+                    />
+                  </section>
+
+                  <section className={styles.addQuestionSection}>
+                    <h3 className={styles.addQuestionSectionTitle}>평가 기준 연결</h3>
+                    <div className={styles.axisChoiceGrid}>
+                      {axesUsed.map(axis => {
+                        const selected = manualAxisKey === axis.key;
+                        return (
+                          <button
+                            key={axis.key}
+                            type="button"
+                            className={`${styles.axisChoice} ${selected ? styles.axisChoiceSelected : ''}`}
+                            onClick={() => setManualAxisKey(axis.key)}
+                          >
+                            <span className={styles.axisChoiceName}>{axis.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                </>
+              )}
+            </div>
+
+            <div className={styles.addQuestionFooter}>
+              <button className={styles.cancelBtn} onClick={() => setShowAddQuestionModal(false)} type="button">취소</button>
+              <button
+                className={styles.addQuestionSubmitBtn}
+                onClick={addQuestionMode === 'ai' ? handleGenerateAdditionalQuestions : handleAddManualQuestion}
+                disabled={loadingAddQuestions}
+                type="button"
+              >
+                {loadingAddQuestions ? '생성 중...' : '질문 추가'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={styles.contentWrapper}>
         {/* Question nav sidebar */}
         <aside className={styles.sidebar}>
@@ -244,6 +492,10 @@ export default function InterviewDetail() {
                 </div>
               );
             })}
+            <button className={styles.addQuestionButton} onClick={openAddQuestionModal} type="button">
+              <span className={styles.addQuestionButtonIcon}>+</span>
+              질문 추가
+            </button>
           </div>
         </aside>
 
@@ -254,7 +506,9 @@ export default function InterviewDetail() {
             <div className={`${styles.card} ${styles.qCard}`}>
               <div className={styles.qCardHeader}>
                 <div className={styles.qCardTypeInfo}>
-                  <span className={styles.qCardTypeBadge}>{categoryLabel(activeQuestion.category).label} 질문</span>
+                  <span className={`${styles.qCardTypeBadge} ${categoryLabel(activeQuestion.category).style}`}>
+                    {categoryLabel(activeQuestion.category).label} 질문
+                  </span>
                   <span className={styles.qCardNum}>Q{activeQuestionIndex + 1}</span>
                 </div>
                 {activeQuestion.axis_name && (
