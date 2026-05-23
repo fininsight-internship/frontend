@@ -113,7 +113,9 @@
 }
 
 .qItem {
+  position: relative;
   padding: 0.625rem;
+  padding-right: 1.875rem;
   border-radius: 0.75rem;
   cursor: pointer;
   transition: all 0.2s;
@@ -122,11 +124,45 @@
 
 .qItem:hover {
   background-color: var(--color-bg);
+  border-color: var(--color-border);
 }
 
 .qItemActive {
   background-color: var(--color-primary-light);
   border-color: rgba(59, 130, 246, 0.2);
+}
+
+.qDeleteBtn {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s, color 0.15s, background-color 0.15s, border-color 0.15s;
+}
+
+.qItem:hover .qDeleteBtn,
+.qDeleteBtn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.qDeleteBtn:hover {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.35);
+  background-color: rgba(220, 38, 38, 0.08);
 }
 
 .qItemHeader {
@@ -631,6 +667,64 @@
   font-size: 0.75rem;
   color: var(--color-text-secondary);
   line-height: 1.5;
+}
+
+.deleteModalPanel {
+  width: min(440px, 100%);
+  overflow: hidden;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-lg, 0 20px 45px rgba(15, 23, 42, 0.2));
+}
+
+.deleteModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 0.75rem;
+}
+
+.deleteModalTitle {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.deleteModalBody {
+  padding: 0 1.25rem 1rem;
+}
+
+.deleteModalText {
+  margin: 0 0 0.75rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.deleteModalFooter {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.deleteConfirmBtn {
+  min-height: 2.75rem;
+  border-radius: 0.875rem;
+  border: none;
+  background-color: #dc2626;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.deleteConfirmBtn:hover {
+  background-color: #b91c1c;
 }
 
 .addQuestionModalPanel {

@@ -192,6 +192,15 @@ export const interviewService = {
     return data;
   },
 
+  /** 저장된 세션에서 질문 삭제 */
+  deleteSessionQuestion: async (
+    sessionId: string,
+    questionId: string
+  ): Promise<{ message: string }> => {
+    const { data } = await api.delete(`/interview/sessions/${sessionId}/questions/${questionId}`);
+    return data;
+  },
+
   // 하위 호환
   getMockContext: async (): Promise<MockContextResponse[]> => {
     const { data } = await api.get('/interview/mock-context');

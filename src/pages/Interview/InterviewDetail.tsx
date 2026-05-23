@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { interviewService } from '../../services/interviewService';
 import type { AvailablePosition, EvaluationAxis, InterviewQuestion, AnswerFeedback, FollowUpQuestion } from '../../types';
@@ -6,6 +6,10 @@ import styles from './InterviewDetail.module.css';
 import { ROUTES } from '../../constants';
 
 type AddQuestionMode = 'ai' | 'manual';
+type PendingDeleteQuestion = {
+  question: InterviewQuestion;
+  index: number;
+};
 
 export default function InterviewDetail() {
   const location = useLocation();
@@ -45,6 +49,7 @@ export default function InterviewDetail() {
   const [manualQuestion, setManualQuestion] = useState('');
   const [manualAxisKey, setManualAxisKey] = useState('');
   const [loadingAddQuestions, setLoadingAddQuestions] = useState(false);
+  const [questionPendingDelete, setQuestionPendingDelete] = useState<PendingDeleteQuestion | null>(null);
 
   if (!state) {
     return (
@@ -85,6 +90,51 @@ export default function InterviewDetail() {
   const handleSelectQuestion = (questionId: string) => {
     setActiveQuestionId(questionId);
     setShowQuestionGuide(false);
+  };
+
+  const deleteQuestion = (questionId: string, questionIndex: number) => {
+    setQuestions(prev => {
+      const deletedIndex = prev[questionIndex]?.id === questionId
+        ? questionIndex
+        : prev.findIndex(q => q.id === questionId);
+      if (deletedIndex < 0) return prev;
+
+      const next = prev.filter((_, idx) => idx !== deletedIndex);
+
+      if (questionId === activeQuestionId) {
+        const nextActiveQuestion = next[deletedIndex] || next[deletedIndex - 1];
+        setActiveQuestionId(nextActiveQuestion?.id || '');
+        setShowQuestionGuide(false);
+      }
+
+      return next;
+    });
+    setLoadingFeedback(prev => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+    setLoadingFollowUp(prev => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+    if (state.sessionId) {
+      interviewService.deleteSessionQuestion(state.sessionId, questionId).catch(() => {
+        alert('질문 삭제 저장에 실패했습니다. 전체 저장하기를 눌러 다시 저장해주세요.');
+      });
+    }
+  };
+
+  const requestDeleteQuestion = (question: InterviewQuestion, index: number, event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setQuestionPendingDelete({ question, index });
+  };
+
+  const confirmDeleteQuestion = () => {
+    if (!questionPendingDelete) return;
+    deleteQuestion(questionPendingDelete.question.id, questionPendingDelete.index);
+    setQuestionPendingDelete(null);
   };
 
   const handleFeedback = async () => {
@@ -350,6 +400,26 @@ export default function InterviewDetail() {
         </div>
       )}
 
+      {questionPendingDelete && (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="delete-question-modal-title">
+          <div className={styles.deleteModalPanel}>
+            <div className={styles.deleteModalHeader}>
+              <h2 id="delete-question-modal-title" className={styles.deleteModalTitle}>질문을 삭제할까요?</h2>
+              <button className={styles.modalCloseBtn} onClick={() => setQuestionPendingDelete(null)} aria-label="삭제 확인 닫기">×</button>
+            </div>
+            <div className={styles.deleteModalBody}>
+              <p className={styles.deleteModalText}>
+                이 질문과 함께 작성한 답변, 피드백, 꼬리질문 기록이 모두 삭제됩니다.
+              </p>
+            </div>
+            <div className={styles.deleteModalFooter}>
+              <button className={styles.cancelBtn} onClick={() => setQuestionPendingDelete(null)} type="button">취소</button>
+              <button className={styles.deleteConfirmBtn} onClick={confirmDeleteQuestion} type="button">삭제</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAddQuestionModal && (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="add-question-modal-title">
           <div className={styles.addQuestionModalPanel}>
@@ -479,6 +549,14 @@ export default function InterviewDetail() {
                   className={`${styles.qItem} ${isActive ? styles.qItemActive : ''}`}
                   onClick={() => handleSelectQuestion(q.id)}
                 >
+                  <button
+                    className={styles.qDeleteBtn}
+                    onClick={(event) => requestDeleteQuestion(q, i, event)}
+                    type="button"
+                    aria-label={`${i + 1}번 질문 삭제`}
+                  >
+                    ×
+                  </button>
                   <div className={styles.qItemHeader}>
                     <div className={`${styles.qNum} ${hasAnswer ? styles.qNumDone : isActive ? styles.qNumActive : styles.qNumPending}`}>
                       {hasAnswer ? "✓" : i + 1}
