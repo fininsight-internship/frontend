@@ -38,13 +38,25 @@ const PLANS = [
   },
 ];
 
-function ProfileSection() {
+function ProfileSection({ userProfile }: { userProfile: any }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
-    name: '김민준', nickname: 'minj',
-    email: 'minj@email.com', phone: '010-1234-5678',
-    jobInterest: '프론트엔드 개발', targetCompany: '대기업, 스타트업',
+    name: '', nickname: '',
+    email: '', jobInterest: '',
   });
+
+  useEffect(() => {
+    if (userProfile) {
+      setForm((prev) => ({
+        ...prev,
+        name: userProfile.name || '',
+        nickname: userProfile.eng_name || '',
+        email: userProfile.email || '',
+        jobInterest: userProfile.role || '',
+      }));
+    }
+  }, [userProfile]);
+
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, [k]: e.target.value }));
 
@@ -70,16 +82,8 @@ function ProfileSection() {
           <input className={styles.input} value={form.email} onChange={update('email')} disabled={!editing} />
         </div>
         <div className={styles.formGroup}>
-          <label className={styles.label}>연락처</label>
-          <input className={styles.input} value={form.phone} onChange={update('phone')} disabled={!editing} />
-        </div>
-        <div className={styles.formGroup}>
           <label className={styles.label}>관심 직무</label>
           <input className={styles.input} value={form.jobInterest} onChange={update('jobInterest')} disabled={!editing} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>목표 기업 유형</label>
-          <input className={styles.input} value={form.targetCompany} onChange={update('targetCompany')} disabled={!editing} />
         </div>
       </div>
     </div>
@@ -298,9 +302,16 @@ function NotificationSection() {
 
 export default function MyPage() {
   const [active, setActive] = useState<Section>('개인정보');
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    api.get('/auth/me')
+      .then(res => setUserProfile(res.data))
+      .catch(err => console.warn('Failed to load user profile', err));
+  }, []);
 
   const contentMap: Record<Section, React.ReactNode> = {
-    개인정보: <ProfileSection />,
+    개인정보: <ProfileSection userProfile={userProfile} />,
     경험관리: <ExperienceSection />,
     구독관리: <SubscriptionSection />,
     알림설정: <NotificationSection />,
@@ -315,9 +326,9 @@ export default function MyPage() {
         <aside className={styles.leftPanel}>
           {/* Profile card */}
           <div className={styles.profileCard}>
-            <div className={styles.avatar}>김</div>
-            <p className={styles.profileName}>김민준</p>
-            <p className={styles.profileEmail}>minj@email.com</p>
+            <div className={styles.avatar}>{userProfile?.name?.[0] || 'U'}</div>
+            <p className={styles.profileName}>{userProfile?.name || '사용자'}</p>
+            <p className={styles.profileEmail}>{userProfile?.email || 'email@example.com'}</p>
             <div className={styles.planBadge}>
               <span className={styles.planBadgeName}>Free 플랜</span>
               <span className={styles.planBadgeUsage}>이번 달 3/5회 사용</span>

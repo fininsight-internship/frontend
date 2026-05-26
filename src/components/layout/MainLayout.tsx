@@ -14,9 +14,9 @@ import styles from './MainLayout.module.css';
 const navItems = [
   { path: ROUTES.HOME, label: '대시보드', icon: LayoutDashboard },
   { path: ROUTES.ANALYSIS, label: '기업 분석', icon: Building2 },
-  { path: ROUTES.APPLICATIONS, label: '지원 현황', icon: ClipboardList },
   { path: ROUTES.RESUME, label: '자기소개서', icon: FileEdit },
   { path: ROUTES.INTERVIEW, label: '면접 연습', icon: MessageSquare },
+  { path: ROUTES.APPLICATIONS, label: '지원 현황', icon: ClipboardList },
   { path: ROUTES.MYPAGE, label: '마이페이지', icon: User },
 ];
 

@@ -77,10 +77,7 @@ export default function LoginPage() {
               />
             </div>
             <div className={styles.fieldGroup}>
-              <div className={styles.passwordHeader}>
-                <label className={styles.label}>비밀번호</label>
-                <button type="button" className={styles.forgotBtn}>비밀번호 찾기</button>
-              </div>
+              <label className={styles.label}>비밀번호</label>
               <input
                 className={styles.input}
                 type="password"
@@ -99,6 +96,14 @@ export default function LoginPage() {
           <p className={styles.switchText}>
             계정이 없으신가요?{' '}
             <Link to={ROUTES.SIGNUP} className={styles.switchLink}>회원가입</Link>
+            <span className={styles.divider}>·</span>
+            <button
+              type="button"
+              className={styles.forgotLink}
+              onClick={() => alert('비밀번호 찾기 기능은 준비 중입니다.')}
+            >
+              비밀번호 찾기
+            </button>
           </p>
         </div>
       </div>

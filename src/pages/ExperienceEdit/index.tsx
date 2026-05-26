@@ -182,46 +182,46 @@ const normalizeProfile = (raw: unknown): ExperienceState => {
         graduationDate: asString(edu?.graduationDate),
       })),
     },
-    자격증상: asArray(source.자격증상, (cert, index) => ({
+    자격증상: source.자격증상 && source.자격증상.length > 0 ? asArray(source.자격증상, (cert, index) => ({
       id: asString(cert?.id) || `cert-${index}`,
       name: asString(cert?.name),
       date: asString(cert?.date),
       organization: asString(cert?.organization),
-    })),
-    경력인턴: asArray(source.경력인턴, (career, index) => ({
+    })) : [{ id: 'cert-0', name: '', date: '', organization: '' }],
+    경력인턴: source.경력인턴 && source.경력인턴.length > 0 ? asArray(source.경력인턴, (career, index) => ({
       id: asString(career?.id) || `career-${index}`,
       company: asString(career?.company),
       department: asString(career?.department),
       startDate: asString(career?.startDate),
       endDate: asString(career?.endDate),
       detail: asString(career?.detail),
-    })),
-    교육부트캠프: asArray(source.교육부트캠프, (bootcamp, index) => ({
+    })) : [{ id: 'career-0', company: '', department: '', startDate: '', endDate: '', detail: '' }],
+    교육부트캠프: source.교육부트캠프 && source.교육부트캠프.length > 0 ? asArray(source.교육부트캠프, (bootcamp, index) => ({
       id: asString(bootcamp?.id) || `bootcamp-${index}`,
       name: asString(bootcamp?.name),
       topic: asString(bootcamp?.topic),
       detail: asString(bootcamp?.detail),
-    })),
-    프로젝트: asArray(source.프로젝트, (item, index) => ({
+    })) : [{ id: 'bootcamp-0', name: '', topic: '', detail: '' }],
+    프로젝트: source.프로젝트 && source.프로젝트.length > 0 ? asArray(source.프로젝트, (item, index) => ({
       id: asString(item?.id) || `project-${index}`,
       title: asString(item?.title),
       detail: asString(item?.detail),
-    })),
-    동아리: asArray(source.동아리, (item, index) => ({
+    })) : [{ id: 'project-0', title: '', detail: '' }],
+    동아리: source.동아리 && source.동아리.length > 0 ? asArray(source.동아리, (item, index) => ({
       id: asString(item?.id) || `club-${index}`,
       title: asString(item?.title),
       detail: asString(item?.detail),
-    })),
-    봉사활동: asArray(source.봉사활동, (item, index) => ({
+    })) : [{ id: 'club-0', title: '', detail: '' }],
+    봉사활동: source.봉사활동 && source.봉사활동.length > 0 ? asArray(source.봉사활동, (item, index) => ({
       id: asString(item?.id) || `volunteer-${index}`,
       title: asString(item?.title),
       detail: asString(item?.detail),
-    })),
-    기타경험: asArray(source.기타경험, (item, index) => ({
+    })) : [{ id: 'volunteer-0', title: '', detail: '' }],
+    기타경험: source.기타경험 && source.기타경험.length > 0 ? asArray(source.기타경험, (item, index) => ({
       id: asString(item?.id) || `other-${index}`,
       title: asString(item?.title),
       detail: asString(item?.detail),
-    })),
+    })) : [{ id: 'other-0', title: '', detail: '' }],
   };
 };
 
@@ -339,6 +339,13 @@ export default function ExperienceEditPage() {
   };
 
   const handleSaveAndNext = async () => {
+    if (!isCategoryComplete('기본정보')) {
+      alert('기본 정보(성명, 생년월일, 학력 1개 이상)는 필수 항목입니다. 모두 입력해 주세요.');
+      if (activeCategory !== '기본정보') {
+        setActiveCategory('기본정보');
+      }
+      return;
+    }
     await handleSave(true);
     if (nextCategory) {
       setActiveCategory(nextCategory);
@@ -349,6 +356,22 @@ export default function ExperienceEditPage() {
       } else {
         navigate(ROUTES.MYPAGE);
       }
+    }
+  };
+
+  const handleFinish = async () => {
+    if (!isCategoryComplete('기본정보')) {
+      alert('기본 정보(성명, 생년월일, 학력 1개 이상)는 필수 항목입니다. 모두 입력해 주세요.');
+      if (activeCategory !== '기본정보') {
+        setActiveCategory('기본정보');
+      }
+      return;
+    }
+    await handleSave(true);
+    if (fromSignup) {
+      navigate(ROUTES.HOME);
+    } else {
+      navigate(ROUTES.MYPAGE);
     }
   };
 
@@ -1015,10 +1038,14 @@ export default function ExperienceEditPage() {
             ← 이전 단계
           </button>
           <div className={styles.actionRight}>
-            <button className={styles.saveBtn} onClick={() => handleSave(false)}>임시 저장</button>
-            <button className={styles.nextBtn} onClick={handleSaveAndNext}>
-              {nextCategory ? '저장 후 다음 단계 →' : '작성 완료 및 완료 페이지로 →'}
+            <button className={styles.saveBtn} onClick={handleFinish} style={{ background: '#4b5563', color: '#fff' }}>
+              작성 완료 및 완료 페이지로 →
             </button>
+            {nextCategory && (
+              <button className={styles.nextBtn} onClick={handleSaveAndNext}>
+                저장 후 다음 단계 →
+              </button>
+            )}
           </div>
         </div>
       </div>

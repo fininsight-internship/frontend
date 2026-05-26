@@ -50,6 +50,7 @@ export default function SignupPage() {
         email: form.email,
         password: form.password,
         name: form.name,
+        nickname: form.nickname,
         role: jobs.join(', '),
       });
       

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { ROUTES } from '../../constants';
@@ -16,25 +16,30 @@ interface Application {
   interview: Status;
 }
 
-const MOCK_APPS: Application[] = [
-  { company: '네이버', role: '프론트엔드 개발자', score: 91, deadline: '2026년 07월 15일', jd: 'done', resume: 'done', interview: 'in_progress' },
-  { company: '라인', role: '풀스택 개발자', score: 78, deadline: '2026년 07월 31일', jd: 'done', resume: 'in_progress', interview: 'waiting' },
-  { company: '카카오', role: '백엔드 개발자', score: 82, deadline: '2026년 06월 30일', jd: 'done', resume: 'in_progress', interview: 'waiting' },
-  { company: '삼성전자', role: '소프트웨어 엔지니어', score: null, deadline: '2026년 06월 20일', jd: 'waiting', resume: 'waiting', interview: 'waiting' },
-  { company: '토스', role: '서버 개발자', score: null, deadline: '2026년 06월 25일', jd: 'waiting', resume: 'waiting', interview: 'waiting' },
-  { company: '토스', role: '프론트엔드 개발자', score: null, deadline: null, jd: 'waiting', resume: 'waiting', interview: 'waiting' },
-];
-
-const JD_LABEL: Record<Status, string> = { done: '완료', in_progress: '진행중', waiting: '대기' };
-const RESUME_LABEL: Record<Status, string> = { done: '완료', in_progress: '작성중', waiting: '대기' };
-const INTERVIEW_LABEL: Record<Status, string> = { done: '완료', in_progress: '진행중', waiting: '대기' };
-const STATUS_CLASS: Record<Status, string> = { done: 'btnDone', in_progress: 'btnProgress', waiting: 'btnWaiting' };
-
 export default function ApplicationsPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const [apps, setApps] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = MOCK_APPS.filter(
+  const JD_LABEL: Record<Status, string> = { done: '완료', in_progress: '진행중', waiting: '대기' };
+  const RESUME_LABEL: Record<Status, string> = { done: '완료', in_progress: '작성중', waiting: '대기' };
+  const INTERVIEW_LABEL: Record<Status, string> = { done: '완료', in_progress: '진행중', waiting: '대기' };
+  const STATUS_CLASS: Record<Status, string> = { done: 'btnDone', in_progress: 'btnProgress', waiting: 'btnWaiting' };
+
+  useEffect(() => {
+    import('../../services/api').then((mod) => {
+      mod.default.get('/user/applications').then((res) => {
+        setApps(res.data);
+        setLoading(false);
+      }).catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
+    });
+  }, []);
+
+  const filtered = apps.filter(
     (a) =>
       a.company.toLowerCase().includes(query.toLowerCase()) ||
       a.role.toLowerCase().includes(query.toLowerCase()),
@@ -65,7 +70,8 @@ export default function ApplicationsPage() {
 
       {/* Application list */}
       <div className={styles.list}>
-        {filtered.map((app, i) => (
+        {loading && <div style={{ padding: '2rem', textAlign: 'center' }}>불러오는 중...</div>}
+        {!loading && filtered.map((app, i) => (
           <div key={i} className={styles.card} onClick={() => handleCardClick(app)}>
             <div className={styles.cardLeft}>
               <div className={styles.companyRow}>
@@ -112,8 +118,8 @@ export default function ApplicationsPage() {
           </div>
         ))}
 
-        {filtered.length === 0 && (
-          <div className={styles.empty}>검색 결과가 없습니다.</div>
+        {!loading && filtered.length === 0 && (
+          <div className={styles.empty}>지원 내역이 없습니다. 새로운 분석을 시작해보세요!</div>
         )}
       </div>
     </div>
